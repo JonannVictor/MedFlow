@@ -27,7 +27,7 @@
 - [x] Tela de Agenda
 - [x] Tela de Consultas Recebidas
 - [x] Tela de Perfil Profissional
-- [ ] Gerenciamento de horarios disponiveis
+- [x] Gerenciamento de horarios disponiveis
 - [x] Aceitar/recusar consultas
 
 ## Fase 5: Design System
@@ -115,6 +115,7 @@
 - [x] Corrigir navegacao das abas do profissional (`consultas` e `perfil`)
 - [x] Remover mock do perfil profissional e preencher dados reais do cadastro
 - [x] Adicionar trigger/backfill no SQL para criar profissionais a partir do signup
+- [x] Persistir horarios disponiveis do profissional no codigo
 - [ ] Aplicar `supabase/schema.sql` no projeto Supabase remoto
 - [ ] Subir o app localmente e validar o fluxo atual em execucao
 - [ ] Definir a proxima frente principal de desenvolvimento apos a retomada

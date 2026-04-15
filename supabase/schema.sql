@@ -28,10 +28,22 @@ create table if not exists public.appointments (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.availability (
+  id uuid primary key default gen_random_uuid(),
+  professional_id uuid not null references public.professionals(id) on delete cascade,
+  day_of_week integer not null check (day_of_week between 0 and 6),
+  start_time text not null,
+  end_time text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists idx_appointments_patient_id on public.appointments(patient_id);
 create index if not exists idx_appointments_professional_id on public.appointments(professional_id);
 create index if not exists idx_appointments_status on public.appointments(status);
 create index if not exists idx_appointments_date_time on public.appointments(date, time);
+create index if not exists idx_availability_professional_id on public.availability(professional_id);
+create index if not exists idx_availability_day_of_week on public.availability(day_of_week);
 
 create or replace function public.sync_professional_from_auth_user()
 returns trigger
@@ -124,6 +136,7 @@ on conflict (id) do update
 
 alter table public.professionals enable row level security;
 alter table public.appointments enable row level security;
+alter table public.availability enable row level security;
 
 drop policy if exists "professionals_select_authenticated" on public.professionals;
 create policy "professionals_select_authenticated"
@@ -176,3 +189,32 @@ for update
 to authenticated
 using (auth.uid() = professional_id)
 with check (auth.uid() = professional_id);
+
+drop policy if exists "availability_select_authenticated" on public.availability;
+create policy "availability_select_authenticated"
+on public.availability
+for select
+to authenticated
+using (true);
+
+drop policy if exists "availability_insert_own" on public.availability;
+create policy "availability_insert_own"
+on public.availability
+for insert
+to authenticated
+with check (auth.uid() = professional_id);
+
+drop policy if exists "availability_update_own" on public.availability;
+create policy "availability_update_own"
+on public.availability
+for update
+to authenticated
+using (auth.uid() = professional_id)
+with check (auth.uid() = professional_id);
+
+drop policy if exists "availability_delete_own" on public.availability;
+create policy "availability_delete_own"
+on public.availability
+for delete
+to authenticated
+using (auth.uid() = professional_id);
