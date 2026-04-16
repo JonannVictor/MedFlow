@@ -61,6 +61,7 @@ export default function ProfessionalDetailScreen() {
         professionalName: professional.name,
         specialty: professional.specialty,
         price: professional.price,
+        meetingUrl: professional.meeting_url,
         date: selectedDate,
         time: selectedTime,
       });

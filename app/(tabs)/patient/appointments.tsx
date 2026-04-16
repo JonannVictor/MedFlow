@@ -2,6 +2,7 @@ import { ScrollView, Text, View, Pressable, FlatList, ActivityIndicator, Alert }
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
+import { openMeetingUrl } from "@/lib/meeting-links";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -86,6 +87,19 @@ export default function PatientAppointmentsScreen() {
     );
   }
 
+  const handleJoinAppointment = async (appointment: AppointmentRecord) => {
+    if (appointment.status !== "confirmed") {
+      Alert.alert("Consulta pendente", "Voce podera entrar na consulta quando o profissional confirmar.");
+      return;
+    }
+
+    try {
+      await openMeetingUrl(appointment.meeting_url);
+    } catch (error) {
+      Alert.alert("Link indisponivel", error instanceof Error ? error.message : "Nao foi possivel abrir a consulta.");
+    }
+  };
+
   const renderAppointmentCard = ({ item }: { item: AppointmentRecord }) => (
     <Pressable
       className="bg-surface rounded-2xl p-4 mb-3 border border-border"
@@ -121,7 +135,7 @@ export default function PatientAppointmentsScreen() {
 
         {isUpcomingAppointment(item) && (
           <View className="flex-row gap-2">
-            <Pressable className="flex-1 bg-primary rounded-lg py-2">
+            <Pressable className="flex-1 bg-primary rounded-lg py-2" onPress={() => handleJoinAppointment(item)}>
               <Text className="text-white font-semibold text-center">Entrar na Consulta</Text>
             </Pressable>
             <Pressable

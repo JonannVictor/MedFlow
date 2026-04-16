@@ -8,10 +8,13 @@ create table if not exists public.professionals (
   price integer not null default 0,
   location text default '',
   crm text not null,
+  meeting_url text,
   rating numeric(2,1),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.professionals add column if not exists meeting_url text;
 
 create table if not exists public.appointments (
   id uuid primary key default gen_random_uuid(),
@@ -21,12 +24,15 @@ create table if not exists public.appointments (
   professional_name text,
   specialty text,
   price integer not null default 0,
+  meeting_url text,
   date date not null,
   time text not null,
   status text not null default 'pending' check (status in ('pending', 'confirmed', 'cancelled', 'completed', 'no-show')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.appointments add column if not exists meeting_url text;
 
 create table if not exists public.availability (
   id uuid primary key default gen_random_uuid(),
@@ -63,6 +69,7 @@ begin
       price,
       location,
       crm,
+      meeting_url,
       rating,
       updated_at
     )
@@ -74,6 +81,7 @@ begin
       coalesce(nullif(new.raw_user_meta_data ->> 'price', '')::integer, 0),
       coalesce(new.raw_user_meta_data ->> 'location', ''),
       new.raw_user_meta_data ->> 'crm',
+      nullif(new.raw_user_meta_data ->> 'meetingUrl', ''),
       null,
       now()
     )
@@ -84,6 +92,7 @@ begin
           price = excluded.price,
           location = excluded.location,
           crm = excluded.crm,
+          meeting_url = excluded.meeting_url,
           updated_at = now();
   end if;
 
@@ -106,6 +115,7 @@ insert into public.professionals (
   price,
   location,
   crm,
+  meeting_url,
   rating,
   created_at,
   updated_at
@@ -118,6 +128,7 @@ select
   coalesce(nullif(u.raw_user_meta_data ->> 'price', '')::integer, 0),
   coalesce(u.raw_user_meta_data ->> 'location', ''),
   u.raw_user_meta_data ->> 'crm',
+  nullif(u.raw_user_meta_data ->> 'meetingUrl', ''),
   null,
   now(),
   now()
@@ -132,6 +143,7 @@ on conflict (id) do update
       price = excluded.price,
       location = excluded.location,
       crm = excluded.crm,
+      meeting_url = excluded.meeting_url,
       updated_at = now();
 
 alter table public.professionals enable row level security;

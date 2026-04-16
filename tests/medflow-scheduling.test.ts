@@ -47,6 +47,7 @@ describe("medflow scheduling helpers", () => {
         price: 10000,
         date: "2026-04-16",
         time: "09:00",
+        meeting_url: null,
         status: "pending",
       },
       {
@@ -59,6 +60,7 @@ describe("medflow scheduling helpers", () => {
         price: 10000,
         date: "2026-04-16",
         time: "10:00",
+        meeting_url: null,
         status: "cancelled",
       },
     ];

@@ -1,5 +1,4 @@
 import { supabase } from "@/lib/supabase";
-import { Linking } from "react-native";
 
 export type AppointmentStatus =
   | "pending"
@@ -132,6 +131,23 @@ function parsePriceToCents(value: unknown, fallback = 0) {
   return fallback;
 }
 
+function normalizeMeetingUrl(value: unknown) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+}
+
 export const medflowQueryKeys = {
   professionals: ["medflow", "professionals"] as const,
   professionalAppointments: (professionalId: string) =>
@@ -189,6 +205,7 @@ export async function upsertProfessionalProfile(profile: ProfessionalProfileInpu
     bio: profile.bio ?? "",
     location: profile.location ?? "",
     price: ensurePositiveInteger(profile.price, 0),
+    meeting_url: normalizeMeetingUrl(profile.meetingUrl) || null,
     rating: typeof profile.rating === "number" ? profile.rating : null,
     updated_at: new Date().toISOString(),
   };
@@ -228,6 +245,12 @@ export async function syncProfessionalProfileFromAuth(user: AuthUserLike | null 
     bio: typeof metadata.bio === "string" ? metadata.bio : "",
     location: typeof metadata.location === "string" ? metadata.location : "",
     price: ensurePositiveInteger(metadata.price, 0),
+    meetingUrl:
+      typeof metadata.meetingUrl === "string"
+        ? metadata.meetingUrl
+        : typeof metadata.meeting_url === "string"
+          ? metadata.meeting_url
+          : "",
     rating: typeof metadata.rating === "number" ? metadata.rating : null,
   });
 }
@@ -292,6 +315,13 @@ export async function getProfessionalProfileFormData(userId: string, fallbackEma
         : typeof metadata.price === "number"
           ? String(metadata.price / 100)
           : "",
+    meetingUrl:
+      professional?.meeting_url ||
+      (typeof metadata.meetingUrl === "string"
+        ? metadata.meetingUrl
+        : typeof metadata.meeting_url === "string"
+          ? metadata.meeting_url
+          : ""),
   } satisfies ProfessionalProfileFormData;
 }
 
@@ -300,6 +330,7 @@ export async function saveProfessionalProfile(
   formData: ProfessionalProfileFormData,
 ) {
   const priceInCents = parsePriceToCents(formData.price, 0);
+  const normalizedMeetingUrl = normalizeMeetingUrl(formData.meetingUrl);
 
   const { error: updateUserError } = await supabase.auth.updateUser({
     data: {
@@ -309,6 +340,7 @@ export async function saveProfessionalProfile(
       crm: formData.crm,
       bio: formData.bio,
       price: priceInCents,
+      meetingUrl: normalizedMeetingUrl,
     },
   });
 
@@ -316,14 +348,35 @@ export async function saveProfessionalProfile(
     throw new Error(toMessage(updateUserError, "Nao foi possivel atualizar os dados do usuario."));
   }
 
-  return upsertProfessionalProfile({
+  const profile = await upsertProfessionalProfile({
     id: userId,
     name: formData.name,
     specialty: formData.specialty,
     crm: formData.crm,
     bio: formData.bio,
     price: priceInCents,
+    meetingUrl: formData.meetingUrl,
   });
+
+  if (normalizedMeetingUrl) {
+    const { error: syncAppointmentsError } = await supabase
+      .from("appointments")
+      .update({
+        meeting_url: normalizedMeetingUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("professional_id", userId)
+      .eq("status", "confirmed")
+      .is("meeting_url", null);
+
+    if (syncAppointmentsError) {
+      throw new Error(
+        toMessage(syncAppointmentsError, "Nao foi possivel sincronizar o link nas consultas confirmadas."),
+      );
+    }
+  }
+
+  return profile;
 }
 
 export async function listProfessionalAvailability(professionalId: string) {
@@ -423,6 +476,7 @@ export async function createAppointment(input: CreateAppointmentInput) {
     professional_name: input.professionalName ?? null,
     specialty: input.specialty ?? null,
     price: ensurePositiveInteger(input.price, 0),
+    meeting_url: normalizeMeetingUrl(input.meetingUrl) || null,
     date: input.date,
     time: input.time,
     status: "pending" as const,
@@ -482,6 +536,36 @@ export async function updateAppointmentStatus(appointmentId: string, status: App
 
   if (error) {
     throw new Error(toMessage(error, "Nao foi possivel atualizar a consulta."));
+  }
+
+  return data as AppointmentRecord;
+}
+
+export async function confirmAppointmentWithMeetingUrl(
+  appointmentId: string,
+  professionalId: string,
+) {
+  const professional = await getProfessionalByIdOrNull(professionalId);
+  const meetingUrl = normalizeMeetingUrl(professional?.meeting_url);
+
+  if (!meetingUrl) {
+    throw new Error("Defina o link da consulta no Perfil antes de confirmar a consulta.");
+  }
+
+  const { data, error } = await supabase
+    .from("appointments")
+    .update({
+      status: "confirmed",
+      meeting_url: meetingUrl || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", appointmentId)
+    .eq("professional_id", professionalId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(toMessage(error, "Nao foi possivel confirmar a consulta."));
   }
 
   return data as AppointmentRecord;

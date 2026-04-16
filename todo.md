@@ -124,6 +124,9 @@
 - [x] Corrigir selecao de datas do agendamento para nao mudar o dia por causa do fuso
 - [x] Ocultar horarios ja reservados da tela de agendamento
 - [x] Bloquear criacao de consulta em horario indisponivel ou ja ocupado
+- [x] Adicionar link padrao de videochamada no perfil profissional
+- [x] Fazer `Entrar/Iniciar Consulta` abrir o link da consulta
+- [x] Sincronizar link de videochamada em consultas confirmadas sem link
 - [ ] Aplicar `supabase/schema.sql` no projeto Supabase remoto
 - [ ] Popular `public.professionals` com pelo menos um profissional real para validar o fluxo do paciente
 - [ ] Investigar instabilidade do `dev:server` ao subir fora do sandbox (`exit code 3221225786`)

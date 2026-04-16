@@ -2,10 +2,12 @@ import { ScrollView, Text, View, Pressable, FlatList, ActivityIndicator, Alert }
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
+import { openMeetingUrl } from "@/lib/meeting-links";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   buildAppointmentDateTime,
+  confirmAppointmentWithMeetingUrl,
   listProfessionalAppointments,
   medflowQueryKeys,
   type AppointmentRecord,
@@ -24,8 +26,17 @@ export default function ProfessionalAppointmentsScreen() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ appointmentId, status }: { appointmentId: string; status: "confirmed" | "cancelled" }) =>
-      updateAppointmentStatus(appointmentId, status),
+    mutationFn: ({ appointmentId, status }: { appointmentId: string; status: "confirmed" | "cancelled" }) => {
+      if (!user) {
+        throw new Error("Usuario nao encontrado.");
+      }
+
+      if (status === "confirmed") {
+        return confirmAppointmentWithMeetingUrl(appointmentId, user.id);
+      }
+
+      return updateAppointmentStatus(appointmentId, status);
+    },
     onSuccess: async (_, variables) => {
       if (user) {
         await queryClient.invalidateQueries({
@@ -65,6 +76,14 @@ export default function ProfessionalAppointmentsScreen() {
 
   const handleReject = (id: string) => {
     updateStatusMutation.mutate({ appointmentId: id, status: "cancelled" });
+  };
+
+  const handleStartAppointment = async (appointment: AppointmentRecord) => {
+    try {
+      await openMeetingUrl(appointment.meeting_url);
+    } catch (error) {
+      Alert.alert("Link indisponivel", error instanceof Error ? error.message : "Nao foi possivel abrir a consulta.");
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -133,7 +152,7 @@ export default function ProfessionalAppointmentsScreen() {
         )}
 
         {item.status === "confirmed" && (
-          <Pressable className="bg-primary rounded-lg py-2">
+          <Pressable className="bg-primary rounded-lg py-2" onPress={() => handleStartAppointment(item)}>
             <Text className="text-white font-semibold text-center">Iniciar Consulta</Text>
           </Pressable>
         )}

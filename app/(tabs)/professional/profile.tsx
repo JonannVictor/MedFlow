@@ -19,6 +19,7 @@ const EMPTY_FORM: ProfessionalProfileFormData = {
   crm: "",
   bio: "",
   price: "",
+  meetingUrl: "",
 };
 
 export default function ProfessionalProfileScreen() {
@@ -216,6 +217,22 @@ export default function ProfessionalProfileScreen() {
                 className={`border rounded-lg px-3 py-2 text-foreground ${
                   isEditing ? "border-primary bg-background" : "border-border bg-background opacity-60"
                 }`}
+                placeholderTextColor={colors.muted}
+              />
+            </View>
+
+            <View className="gap-2">
+              <Text className="text-sm font-semibold text-foreground">Link da Consulta</Text>
+              <TextInput
+                value={formData.meetingUrl}
+                onChangeText={(text) => setFormData({ ...formData, meetingUrl: text })}
+                editable={isEditing}
+                autoCapitalize="none"
+                keyboardType="url"
+                className={`border rounded-lg px-3 py-2 text-foreground ${
+                  isEditing ? "border-primary bg-background" : "border-border bg-background opacity-60"
+                }`}
+                placeholder="https://meet.google.com/..."
                 placeholderTextColor={colors.muted}
               />
             </View>
