@@ -1,4 +1,5 @@
 import { ScrollView, Text, View, Pressable, FlatList, ActivityIndicator, Alert } from "react-native";
+import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
@@ -47,6 +48,9 @@ export default function ProfessionalHomeScreen() {
           queryKey: medflowQueryKeys.patientAppointments(updatedAppointment.patient_id),
         });
       }
+    },
+    onError: (error) => {
+      Alert.alert("Erro ao atualizar", error.message);
     },
   });
 
@@ -107,15 +111,35 @@ export default function ProfessionalHomeScreen() {
           <View className="flex-row gap-2">
             <Pressable
               className="flex-1 bg-success rounded-lg py-2"
-              onPress={() => updateStatusMutation.mutate({ appointmentId: item.id, status: "confirmed" })}
+              onPress={() => {
+                if (item.payment_status !== "paid") {
+                  Alert.alert(
+                    "Pagamento pendente",
+                    "A consulta so pode ser confirmada depois que o pagamento for aprovado.",
+                  );
+                  return;
+                }
+
+                updateStatusMutation.mutate({ appointmentId: item.id, status: "confirmed" });
+              }}
+              disabled={updateStatusMutation.isPending || item.payment_status !== "paid"}
             >
-              <Text className="text-white font-semibold text-center">Confirmar</Text>
+              <Text className="text-white font-semibold text-center">
+                {item.payment_status !== "paid"
+                  ? "Aguardando pagamento"
+                  : updateStatusMutation.isPending
+                    ? "Salvando..."
+                    : "Confirmar"}
+              </Text>
             </Pressable>
             <Pressable
               className="flex-1 bg-error rounded-lg py-2"
               onPress={() => updateStatusMutation.mutate({ appointmentId: item.id, status: "cancelled" })}
+              disabled={updateStatusMutation.isPending}
             >
-              <Text className="text-white font-semibold text-center">Recusar</Text>
+              <Text className="text-white font-semibold text-center">
+                {updateStatusMutation.isPending ? "Salvando..." : "Recusar"}
+              </Text>
             </Pressable>
           </View>
         )}
@@ -173,10 +197,13 @@ export default function ProfessionalHomeScreen() {
 
           <View className="gap-2">
             <Text className="text-lg font-bold text-foreground">Acoes Rapidas</Text>
-            <Pressable className="bg-primary rounded-lg py-3">
+            <Pressable className="bg-primary rounded-lg py-3" onPress={() => router.push("/(tabs)/professional/schedule" as any)}>
               <Text className="text-white font-semibold text-center">Gerenciar Horarios</Text>
             </Pressable>
-            <Pressable className="bg-surface border border-border rounded-lg py-3">
+            <Pressable
+              className="bg-surface border border-border rounded-lg py-3"
+              onPress={() => router.push("/(tabs)/professional/appointments" as any)}
+            >
               <Text className="text-primary font-semibold text-center">Ver Historico</Text>
             </Pressable>
           </View>

@@ -2,6 +2,7 @@ import { ScrollView, Text, View, Pressable, ActivityIndicator, Alert } from "rea
 import { useLocalSearchParams, router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { createMercadoPagoPreference, openMercadoPagoCheckout } from "@/lib/mercado-pago";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
@@ -15,6 +16,7 @@ import {
   listProfessionalAppointments,
   medflowQueryKeys,
   parseDateOnlyString,
+  updateAppointmentPaymentMetadata,
   toStoredDayOfWeek,
 } from "@/lib/medflow-supabase";
 
@@ -54,7 +56,7 @@ export default function ProfessionalDetailScreen() {
         throw new Error("Selecione profissional, data e horario antes de confirmar.");
       }
 
-      return createAppointment({
+      const appointment = await createAppointment({
         patientId: user.id,
         patientName: user.name || user.email,
         professionalId,
@@ -65,6 +67,30 @@ export default function ProfessionalDetailScreen() {
         date: selectedDate,
         time: selectedTime,
       });
+
+      try {
+        const paymentPreference = await createMercadoPagoPreference({
+          appointmentId: appointment.id,
+          title: "Consulta medica",
+          description: professional.name,
+          unitPrice: professional.price / 100,
+        });
+
+        await updateAppointmentPaymentMetadata(appointment.id, {
+          paymentPreferenceId: paymentPreference.preferenceId,
+          paymentCheckoutUrl: paymentPreference.checkoutUrl,
+        });
+
+        await openMercadoPagoCheckout(paymentPreference.checkoutUrl);
+      } catch (error) {
+        await updateAppointmentPaymentMetadata(appointment.id, {
+          paymentStatus: "failed",
+          status: "pending",
+        });
+        throw error;
+      }
+
+      return appointment;
     },
     onSuccess: async () => {
       if (user) {
@@ -75,8 +101,10 @@ export default function ProfessionalDetailScreen() {
       await queryClient.invalidateQueries({
         queryKey: medflowQueryKeys.professionalAppointments(professionalId),
       });
-      Alert.alert("Consulta agendada", "Sua consulta foi criada com sucesso.");
-      router.replace("/(tabs)/patient/appointments" as any);
+      Alert.alert(
+        "Pagamento iniciado",
+        "Conclua o pagamento no checkout para confirmar a consulta."
+      );
     },
     onError: (error) => {
       Alert.alert("Erro ao agendar", error.message);

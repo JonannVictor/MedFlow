@@ -48,6 +48,10 @@ describe("medflow scheduling helpers", () => {
         date: "2026-04-16",
         time: "09:00",
         meeting_url: null,
+        payment_status: "pending",
+        payment_id: null,
+        payment_preference_id: null,
+        payment_checkout_url: null,
         status: "pending",
       },
       {
@@ -61,6 +65,10 @@ describe("medflow scheduling helpers", () => {
         date: "2026-04-16",
         time: "10:00",
         meeting_url: null,
+        payment_status: "failed",
+        payment_id: null,
+        payment_preference_id: null,
+        payment_checkout_url: null,
         status: "cancelled",
       },
     ];

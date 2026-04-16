@@ -25,6 +25,10 @@ create table if not exists public.appointments (
   specialty text,
   price integer not null default 0,
   meeting_url text,
+  payment_status text not null default 'pending' check (payment_status in ('pending', 'paid', 'failed')),
+  payment_id text,
+  payment_preference_id text,
+  payment_checkout_url text,
   date date not null,
   time text not null,
   status text not null default 'pending' check (status in ('pending', 'confirmed', 'cancelled', 'completed', 'no-show')),
@@ -33,6 +37,10 @@ create table if not exists public.appointments (
 );
 
 alter table public.appointments add column if not exists meeting_url text;
+alter table public.appointments add column if not exists payment_status text not null default 'pending';
+alter table public.appointments add column if not exists payment_id text;
+alter table public.appointments add column if not exists payment_preference_id text;
+alter table public.appointments add column if not exists payment_checkout_url text;
 
 create table if not exists public.availability (
   id uuid primary key default gen_random_uuid(),

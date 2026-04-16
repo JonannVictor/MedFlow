@@ -47,6 +47,13 @@
 - [ ] Gerar APK/IPA
 - [ ] Instrucoes de uso
 
+## Fase Futura: Marketplace e Repasse
+- [ ] Integrar Mercado Pago Marketplace com OAuth por profissional
+- [ ] Implementar split automatico de pagamentos
+- [ ] Configurar comissao automatica de 10% para a plataforma
+- [ ] Repassar 90% automaticamente ao medico
+- [ ] Validar onboarding financeiro do profissional
+
 ## Fase 8: Dashboard Profissional (Em Desenvolvimento)
 - [x] Tela Home Profissional (proximas consultas)
 - [x] Tela de Agenda (calendario)
@@ -127,8 +134,15 @@
 - [x] Adicionar link padrao de videochamada no perfil profissional
 - [x] Fazer `Entrar/Iniciar Consulta` abrir o link da consulta
 - [x] Sincronizar link de videochamada em consultas confirmadas sem link
-- [ ] Aplicar `supabase/schema.sql` no projeto Supabase remoto
-- [ ] Popular `public.professionals` com pelo menos um profissional real para validar o fluxo do paciente
+- [x] Ligar acoes rapidas da home do profissional
+- [x] Evitar toques repetidos nas acoes de confirmar, recusar e cancelar consultas
+- [x] Melhorar feedback de sucesso e erro nas acoes principais de consulta
+- [x] Criar fluxo de pagamento com Mercado Pago via Checkout Pro
+- [x] Abrir checkout do pagamento antes de confirmar a consulta
+- [x] Confirmar consulta apenas apos retorno com pagamento aprovado
+- [x] Preparar colunas e envs para status e referencia de pagamento
+- [x] Aplicar `supabase/schema.sql` no projeto Supabase remoto
+- [x] Popular `public.professionals` com pelo menos um profissional real para validar o fluxo do paciente
 - [ ] Investigar instabilidade do `dev:server` ao subir fora do sandbox (`exit code 3221225786`)
 - [x] Subir o app localmente e validar o boot web
 - [ ] Definir a proxima frente principal de desenvolvimento apos a retomada

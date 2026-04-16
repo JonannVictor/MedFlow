@@ -7,6 +7,8 @@ export type AppointmentStatus =
   | "completed"
   | "no-show";
 
+export type PaymentStatus = "pending" | "paid" | "failed";
+
 export type ProfessionalRecord = {
   id: string;
   name: string;
@@ -32,6 +34,10 @@ export type AppointmentRecord = {
   date: string;
   time: string;
   meeting_url: string | null;
+  payment_status: PaymentStatus;
+  payment_id: string | null;
+  payment_preference_id: string | null;
+  payment_checkout_url: string | null;
   status: AppointmentStatus;
   created_at?: string;
   updated_at?: string;
@@ -86,6 +92,14 @@ type CreateAppointmentInput = {
   meetingUrl?: string | null;
   date: string;
   time: string;
+};
+
+type AppointmentPaymentMetadata = {
+  paymentPreferenceId?: string | null;
+  paymentCheckoutUrl?: string | null;
+  paymentId?: string | null;
+  paymentStatus?: PaymentStatus;
+  status?: AppointmentStatus;
 };
 
 type AppointmentConflictStatus = "pending" | "confirmed";
@@ -477,6 +491,10 @@ export async function createAppointment(input: CreateAppointmentInput) {
     specialty: input.specialty ?? null,
     price: ensurePositiveInteger(input.price, 0),
     meeting_url: normalizeMeetingUrl(input.meetingUrl) || null,
+    payment_status: "pending" as const,
+    payment_id: null,
+    payment_preference_id: null,
+    payment_checkout_url: null,
     date: input.date,
     time: input.time,
     status: "pending" as const,
@@ -488,6 +506,48 @@ export async function createAppointment(input: CreateAppointmentInput) {
 
   if (error) {
     throw new Error(toMessage(error, "Nao foi possivel criar a consulta."));
+  }
+
+  return data as AppointmentRecord;
+}
+
+export async function updateAppointmentPaymentMetadata(
+  appointmentId: string,
+  metadata: AppointmentPaymentMetadata,
+) {
+  const payload: Record<string, string | null> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (metadata.paymentPreferenceId !== undefined) {
+    payload.payment_preference_id = metadata.paymentPreferenceId;
+  }
+
+  if (metadata.paymentCheckoutUrl !== undefined) {
+    payload.payment_checkout_url = metadata.paymentCheckoutUrl;
+  }
+
+  if (metadata.paymentId !== undefined) {
+    payload.payment_id = metadata.paymentId;
+  }
+
+  if (metadata.paymentStatus !== undefined) {
+    payload.payment_status = metadata.paymentStatus;
+  }
+
+  if (metadata.status !== undefined) {
+    payload.status = metadata.status;
+  }
+
+  const { data, error } = await supabase
+    .from("appointments")
+    .update(payload)
+    .eq("id", appointmentId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(toMessage(error, "Nao foi possivel atualizar o pagamento da consulta."));
   }
 
   return data as AppointmentRecord;

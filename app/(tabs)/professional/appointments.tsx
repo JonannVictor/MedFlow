@@ -71,6 +71,12 @@ export default function ProfessionalAppointmentsScreen() {
   });
 
   const handleConfirm = (id: string) => {
+    const appointment = appointments.find((item) => item.id === id);
+    if (appointment?.payment_status !== "paid") {
+      Alert.alert("Pagamento pendente", "A consulta so pode ser confirmada depois que o pagamento for aprovado.");
+      return;
+    }
+
     updateStatusMutation.mutate({ appointmentId: id, status: "confirmed" });
   };
 
@@ -142,11 +148,27 @@ export default function ProfessionalAppointmentsScreen() {
 
         {item.status === "pending" && (
           <View className="flex-row gap-2">
-            <Pressable className="flex-1 bg-success rounded-lg py-2" onPress={() => handleConfirm(item.id)}>
-              <Text className="text-white font-semibold text-center">Confirmar</Text>
+            <Pressable
+              className="flex-1 bg-success rounded-lg py-2"
+              onPress={() => handleConfirm(item.id)}
+              disabled={updateStatusMutation.isPending || item.payment_status !== "paid"}
+            >
+              <Text className="text-white font-semibold text-center">
+                {item.payment_status !== "paid"
+                  ? "Aguardando pagamento"
+                  : updateStatusMutation.isPending
+                    ? "Salvando..."
+                    : "Confirmar"}
+              </Text>
             </Pressable>
-            <Pressable className="flex-1 bg-error rounded-lg py-2" onPress={() => handleReject(item.id)}>
-              <Text className="text-white font-semibold text-center">Recusar</Text>
+            <Pressable
+              className="flex-1 bg-error rounded-lg py-2"
+              onPress={() => handleReject(item.id)}
+              disabled={updateStatusMutation.isPending}
+            >
+              <Text className="text-white font-semibold text-center">
+                {updateStatusMutation.isPending ? "Salvando..." : "Recusar"}
+              </Text>
             </Pressable>
           </View>
         )}

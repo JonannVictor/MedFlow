@@ -66,6 +66,7 @@ export default function PatientAppointmentsScreen() {
           queryKey: medflowQueryKeys.patientAppointments(user.id),
         });
       }
+      Alert.alert("Consulta cancelada", "Sua consulta foi cancelada com sucesso.");
     },
     onError: (error) => {
       Alert.alert("Erro ao cancelar", error.message);
@@ -143,7 +144,9 @@ export default function PatientAppointmentsScreen() {
               onPress={() => cancelMutation.mutate(item.id)}
               disabled={cancelMutation.isPending}
             >
-              <Text className="text-white font-semibold text-center">Cancelar</Text>
+              <Text className="text-white font-semibold text-center">
+                {cancelMutation.isPending ? "Cancelando..." : "Cancelar"}
+              </Text>
             </Pressable>
           </View>
         )}
