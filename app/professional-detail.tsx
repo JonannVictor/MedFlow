@@ -2,10 +2,17 @@ import { ScrollView, Text, View, Pressable, ActivityIndicator, Alert } from "rea
 import { useLocalSearchParams, router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
-import { createAppointment, getProfessionalById, medflowQueryKeys } from "@/lib/medflow-supabase";
+import {
+  createAppointment,
+  generateAvailableTimeSlots,
+  getProfessionalById,
+  listProfessionalAvailability,
+  medflowQueryKeys,
+  toStoredDayOfWeek,
+} from "@/lib/medflow-supabase";
 
 export default function ProfessionalDetailScreen() {
   const colors = useColors();
@@ -20,6 +27,11 @@ export default function ProfessionalDetailScreen() {
   const { data: professional, isLoading } = useQuery({
     queryKey: [...medflowQueryKeys.professionals, professionalId],
     queryFn: () => getProfessionalById(professionalId),
+    enabled: Boolean(professionalId),
+  });
+  const { data: availability = [], isLoading: availabilityLoading } = useQuery({
+    queryKey: medflowQueryKeys.professionalAvailability(professionalId),
+    queryFn: () => listProfessionalAvailability(professionalId),
     enabled: Boolean(professionalId),
   });
 
@@ -61,7 +73,7 @@ export default function ProfessionalDetailScreen() {
     },
   });
 
-  if (authLoading || isLoading) {
+  if (authLoading || isLoading || availabilityLoading) {
     return (
       <ScreenContainer className="items-center justify-center">
         <ActivityIndicator size="large" color={colors.primary} />
@@ -86,25 +98,18 @@ export default function ProfessionalDetailScreen() {
     date.setDate(date.getDate() + i);
     return date;
   });
+  const selectedDateObject = selectedDate ? new Date(`${selectedDate}T00:00:00`) : null;
+  const selectedStoredDay = selectedDateObject ? toStoredDayOfWeek(selectedDateObject) : null;
+  const availableTimeSlots = useMemo(() => {
+    if (selectedStoredDay === null) return [];
+    return generateAvailableTimeSlots(availability, selectedStoredDay);
+  }, [availability, selectedStoredDay]);
+  const morningSlots = availableTimeSlots.filter((time) => Number(time.split(":")[0]) < 12);
+  const afternoonSlots = availableTimeSlots.filter((time) => Number(time.split(":")[0]) >= 12);
 
-  const timeSlots = [
-    "08:00",
-    "08:30",
-    "09:00",
-    "09:30",
-    "10:00",
-    "10:30",
-    "11:00",
-    "11:30",
-    "14:00",
-    "14:30",
-    "15:00",
-    "15:30",
-    "16:00",
-    "16:30",
-    "17:00",
-    "17:30",
-  ];
+  useEffect(() => {
+    setSelectedTime("");
+  }, [selectedDate]);
 
   return (
     <ScreenContainer className="bg-background">
@@ -236,7 +241,7 @@ export default function ProfessionalDetailScreen() {
               <View className="gap-2">
                 <Text className="text-sm text-muted font-semibold">Manha</Text>
                 <View className="flex-row gap-2 flex-wrap">
-                  {timeSlots.slice(0, 8).map((time) => {
+                  {morningSlots.map((time) => {
                     const isSelected = selectedTime === time;
                     return (
                       <Pressable
@@ -262,7 +267,7 @@ export default function ProfessionalDetailScreen() {
 
                 <Text className="text-sm text-muted font-semibold mt-3">Tarde</Text>
                 <View className="flex-row gap-2 flex-wrap">
-                  {timeSlots.slice(8).map((time) => {
+                  {afternoonSlots.map((time) => {
                     const isSelected = selectedTime === time;
                     return (
                       <Pressable
@@ -285,6 +290,14 @@ export default function ProfessionalDetailScreen() {
                     );
                   })}
                 </View>
+
+                {availableTimeSlots.length === 0 && (
+                  <View className="bg-surface border border-border rounded-lg p-4 mt-2">
+                    <Text className="text-sm text-muted">
+                      Nenhum horario disponivel para a data selecionada.
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <View className="flex-row gap-2 pt-4">

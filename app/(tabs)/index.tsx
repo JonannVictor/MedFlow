@@ -1,5 +1,5 @@
 import { ScrollView, Text, View, TextInput, Pressable, FlatList, ActivityIndicator } from "react-native";
-import { Link } from "expo-router";
+import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useAuth } from "@/hooks/use-auth";
@@ -92,17 +92,21 @@ export default function HomeScreen() {
                   </View>
 
                   {/* Book Button */}
-                  <Link href={`professional-detail?id=${prof.id}` as any} asChild>
-                    <Pressable
-                      style={({ pressed }) => [{
-                        backgroundColor: colors.primary,
-                        opacity: pressed ? 0.9 : 1,
-                      }]}
-                      className="py-3 px-4 rounded-lg items-center"
-                    >
-                      <Text className="text-base font-semibold text-white">Agendar Consulta</Text>
-                    </Pressable>
-                  </Link>
+                  <Pressable
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(tabs)/patient/booking",
+                        params: { professionalId: prof.id },
+                      })
+                    }
+                    style={({ pressed }) => [{
+                      backgroundColor: colors.primary,
+                      opacity: pressed ? 0.9 : 1,
+                    }]}
+                    className="py-3 px-4 rounded-lg items-center"
+                  >
+                    <Text className="text-base font-semibold text-white">Agendar Consulta</Text>
+                  </Pressable>
                 </View>
               ))}
             </View>

@@ -59,6 +59,7 @@
 - [x] Seletor de Horario
 - [x] Confirmacao de Agendamento
 - [x] Integracao com banco de dados
+- [x] Conectar horarios reais da tabela `availability` na tela de agendamento
 
 ## Fase 10: Integracao de Autenticacao
 - [x] Cadastro Paciente funcional com banco
@@ -71,6 +72,7 @@
 - [x] Landing -> Login
 - [x] Login -> Dashboard (paciente/profissional)
 - [x] Dashboard -> Agendamento
+- [x] Botao "Agendar" da lista de profissionais navega para a rota de booking
 - [x] Logout -> Landing
 - [x] Protecao de rotas autenticadas
 
@@ -116,6 +118,7 @@
 - [x] Remover mock do perfil profissional e preencher dados reais do cadastro
 - [x] Adicionar trigger/backfill no SQL para criar profissionais a partir do signup
 - [x] Persistir horarios disponiveis do profissional no codigo
+- [x] Garantir criacao automatica do registro profissional antes de salvar agenda
 - [ ] Aplicar `supabase/schema.sql` no projeto Supabase remoto
-- [ ] Subir o app localmente e validar o fluxo atual em execucao
+- [x] Subir o app localmente e validar o boot web
 - [ ] Definir a proxima frente principal de desenvolvimento apos a retomada

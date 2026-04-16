@@ -48,6 +48,12 @@ export default function PatientTabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="booking"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

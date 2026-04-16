@@ -224,6 +224,27 @@ export async function syncProfessionalProfileFromAuth(user: AuthUserLike | null 
   });
 }
 
+export async function ensureProfessionalProfileForCurrentUser(userId: string) {
+  const existingProfile = await getProfessionalByIdOrNull(userId);
+  if (existingProfile) {
+    return existingProfile;
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    throw new Error(toMessage(authError, "Nao foi possivel carregar o usuario autenticado."));
+  }
+
+  const syncedProfile = await syncProfessionalProfileFromAuth(authData.user ?? null);
+  if (syncedProfile) {
+    return syncedProfile;
+  }
+
+  throw new Error(
+    "Seu perfil profissional ainda nao foi criado. Abra a aba Perfil, confira especialidade e CRM e salve uma vez."
+  );
+}
+
 export async function getProfessionalProfileFormData(userId: string, fallbackEmail = "") {
   const [
     { data: authData, error: authError },
@@ -317,6 +338,8 @@ export async function replaceProfessionalAvailability(
   dayOfWeek: number,
   selectedTimes: string[],
 ) {
+  await ensureProfessionalProfileForCurrentUser(professionalId);
+
   const { error: deleteError } = await supabase
     .from("availability")
     .delete()
@@ -428,4 +451,38 @@ export async function updateAppointmentStatus(appointmentId: string, status: App
 
 export function buildAppointmentDateTime(date: string, time: string) {
   return new Date(`${date}T${time}:00`);
+}
+
+export function toStoredDayOfWeek(date: Date) {
+  const jsDayOfWeek = date.getDay();
+  return jsDayOfWeek === 0 ? 6 : jsDayOfWeek - 1;
+}
+
+export function generateTimeSlotsFromRange(startTime: string, endTime: string) {
+  const slots: string[] = [];
+  const [startHour, startMinute] = startTime.split(":").map(Number);
+  const [endHour, endMinute] = endTime.split(":").map(Number);
+
+  let currentMinutes = startHour * 60 + startMinute;
+  const endMinutes = endHour * 60 + endMinute;
+
+  while (currentMinutes < endMinutes) {
+    const hours = Math.floor(currentMinutes / 60);
+    const minutes = currentMinutes % 60;
+    slots.push(`${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`);
+    currentMinutes += 60;
+  }
+
+  return slots;
+}
+
+export function generateAvailableTimeSlots(
+  availability: AvailabilityRecord[],
+  storedDayOfWeek: number,
+) {
+  const daySlots = availability
+    .filter((item) => item.day_of_week === storedDayOfWeek)
+    .flatMap((item) => generateTimeSlotsFromRange(item.start_time, item.end_time));
+
+  return Array.from(new Set(daySlots)).sort((a, b) => a.localeCompare(b));
 }

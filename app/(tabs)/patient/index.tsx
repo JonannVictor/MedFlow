@@ -60,7 +60,7 @@ export default function PatientHomeScreen() {
             className="bg-primary rounded-lg px-4 py-2"
             onPress={() =>
               router.push({
-                pathname: "/professional-detail",
+                pathname: "/(tabs)/patient/booking",
                 params: { professionalId: item.id },
               })
             }
