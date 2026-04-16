@@ -73,6 +73,24 @@ export default function ProfessionalDetailScreen() {
     },
   });
 
+  const nextDays = Array.from({ length: 7 }).map((_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() + i);
+    return date;
+  });
+  const selectedDateObject = selectedDate ? new Date(`${selectedDate}T00:00:00`) : null;
+  const selectedStoredDay = selectedDateObject ? toStoredDayOfWeek(selectedDateObject) : null;
+  const availableTimeSlots = useMemo(() => {
+    if (selectedStoredDay === null) return [];
+    return generateAvailableTimeSlots(availability, selectedStoredDay);
+  }, [availability, selectedStoredDay]);
+  const morningSlots = availableTimeSlots.filter((time) => Number(time.split(":")[0]) < 12);
+  const afternoonSlots = availableTimeSlots.filter((time) => Number(time.split(":")[0]) >= 12);
+
+  useEffect(() => {
+    setSelectedTime("");
+  }, [selectedDate]);
+
   if (authLoading || isLoading || availabilityLoading) {
     return (
       <ScreenContainer className="items-center justify-center">
@@ -92,24 +110,6 @@ export default function ProfessionalDetailScreen() {
   const handleBookAppointment = async () => {
     await createAppointmentMutation.mutateAsync();
   };
-
-  const nextDays = Array.from({ length: 7 }).map((_, i) => {
-    const date = new Date();
-    date.setDate(date.getDate() + i);
-    return date;
-  });
-  const selectedDateObject = selectedDate ? new Date(`${selectedDate}T00:00:00`) : null;
-  const selectedStoredDay = selectedDateObject ? toStoredDayOfWeek(selectedDateObject) : null;
-  const availableTimeSlots = useMemo(() => {
-    if (selectedStoredDay === null) return [];
-    return generateAvailableTimeSlots(availability, selectedStoredDay);
-  }, [availability, selectedStoredDay]);
-  const morningSlots = availableTimeSlots.filter((time) => Number(time.split(":")[0]) < 12);
-  const afternoonSlots = availableTimeSlots.filter((time) => Number(time.split(":")[0]) >= 12);
-
-  useEffect(() => {
-    setSelectedTime("");
-  }, [selectedDate]);
 
   return (
     <ScreenContainer className="bg-background">

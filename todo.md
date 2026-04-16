@@ -119,6 +119,10 @@
 - [x] Adicionar trigger/backfill no SQL para criar profissionais a partir do signup
 - [x] Persistir horarios disponiveis do profissional no codigo
 - [x] Garantir criacao automatica do registro profissional antes de salvar agenda
+- [x] Corrigir erro de ordem de hooks na tela de agendamento do paciente
+- [x] Corrigir script `dev:metro` para subir corretamente no Windows
 - [ ] Aplicar `supabase/schema.sql` no projeto Supabase remoto
+- [ ] Popular `public.professionals` com pelo menos um profissional real para validar o fluxo do paciente
+- [ ] Investigar instabilidade do `dev:server` ao subir fora do sandbox (`exit code 3221225786`)
 - [x] Subir o app localmente e validar o boot web
 - [ ] Definir a proxima frente principal de desenvolvimento apos a retomada
