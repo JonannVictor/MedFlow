@@ -2,7 +2,7 @@ import { ScrollView, Text, View, Pressable, ActivityIndicator, Alert } from "rea
 import { useLocalSearchParams, router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { createMercadoPagoPreference, openMercadoPagoCheckout } from "@/lib/mercado-pago";
+import { createMercadoPagoPixPayment } from "@/lib/mercado-pago";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
@@ -69,19 +69,27 @@ export default function ProfessionalDetailScreen() {
       });
 
       try {
-        const paymentPreference = await createMercadoPagoPreference({
+        if (!user.email) {
+          throw new Error("Seu usuario precisa ter um e-mail para gerar o Pix.");
+        }
+
+        const pixPayment = await createMercadoPagoPixPayment({
           appointmentId: appointment.id,
-          title: "Consulta medica",
-          description: professional.name,
-          unitPrice: professional.price / 100,
+          description: `Consulta medica com ${professional.name}`,
+          transactionAmount: professional.price / 100,
+          payer: {
+            email: user.email,
+            firstName: user.name?.split(" ")[0] || undefined,
+          },
         });
 
         await updateAppointmentPaymentMetadata(appointment.id, {
-          paymentPreferenceId: paymentPreference.preferenceId,
-          paymentCheckoutUrl: paymentPreference.checkoutUrl,
+          paymentPreferenceId: pixPayment.orderId,
+          paymentCheckoutUrl: pixPayment.ticketUrl,
+          paymentId: pixPayment.paymentId,
+          paymentStatus: pixPayment.paymentStatus,
+          status: pixPayment.appointmentStatus,
         });
-
-        await openMercadoPagoCheckout(paymentPreference.checkoutUrl);
       } catch (error) {
         await updateAppointmentPaymentMetadata(appointment.id, {
           paymentStatus: "failed",
@@ -92,7 +100,7 @@ export default function ProfessionalDetailScreen() {
 
       return appointment;
     },
-    onSuccess: async () => {
+    onSuccess: async (appointment) => {
       if (user) {
         await queryClient.invalidateQueries({
           queryKey: medflowQueryKeys.patientAppointments(user.id),
@@ -101,10 +109,12 @@ export default function ProfessionalDetailScreen() {
       await queryClient.invalidateQueries({
         queryKey: medflowQueryKeys.professionalAppointments(professionalId),
       });
-      Alert.alert(
-        "Pagamento iniciado",
-        "Conclua o pagamento no checkout para confirmar a consulta."
-      );
+      router.replace({
+        pathname: "/(tabs)/patient/appointments" as any,
+        params: {
+          openPixAppointmentId: appointment.id,
+        },
+      });
     },
     onError: (error) => {
       Alert.alert("Erro ao agendar", error.message);
@@ -448,7 +458,7 @@ export default function ProfessionalDetailScreen() {
                   {createAppointmentMutation.isPending ? (
                     <ActivityIndicator color="white" />
                   ) : (
-                    <Text className="text-base font-semibold text-white">Confirmar Agendamento</Text>
+                    <Text className="text-base font-semibold text-white">Gerar Pix da Consulta</Text>
                   )}
                 </Pressable>
               </View>

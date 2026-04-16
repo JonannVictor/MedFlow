@@ -151,14 +151,10 @@ export default function ProfessionalAppointmentsScreen() {
             <Pressable
               className="flex-1 bg-success rounded-lg py-2"
               onPress={() => handleConfirm(item.id)}
-              disabled={updateStatusMutation.isPending || item.payment_status !== "paid"}
+              disabled={updateStatusMutation.isPending}
             >
               <Text className="text-white font-semibold text-center">
-                {item.payment_status !== "paid"
-                  ? "Aguardando pagamento"
-                  : updateStatusMutation.isPending
-                    ? "Salvando..."
-                    : "Confirmar"}
+                {updateStatusMutation.isPending ? "Salvando..." : "Confirmar Consulta"}
               </Text>
             </Pressable>
             <Pressable

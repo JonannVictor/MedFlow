@@ -13,9 +13,25 @@ const createPreferenceSchema = z.object({
   pendingUrl: z.string().url(),
 });
 
+const createPixPaymentSchema = z.object({
+  appointmentId: z.string().uuid(),
+  description: z.string().min(1),
+  transactionAmount: z.number().positive(),
+  payer: z.object({
+    email: z.string().email(),
+    firstName: z.string().min(1).optional(),
+    lastName: z.string().min(1).optional(),
+  }),
+});
+
 const verifyPaymentSchema = z.object({
   appointmentId: z.string().uuid(),
   paymentId: z.string().min(1),
+});
+
+const verifyPixPaymentSchema = z.object({
+  appointmentId: z.string().uuid(),
+  orderId: z.string().min(1),
 });
 
 function getMercadoPagoHeaders(idempotencyKey?: string) {
@@ -48,6 +64,47 @@ function mapPaymentStatus(status: string) {
   return {
     paymentStatus: "pending" as const,
     appointmentStatus: "pending" as const,
+  };
+}
+
+function mapOrderStatus(status: string) {
+  if (status === "processed") {
+    return {
+      paymentStatus: "paid" as const,
+      appointmentStatus: "confirmed" as const,
+    };
+  }
+
+  if (status === "canceled" || status === "expired") {
+    return {
+      paymentStatus: "failed" as const,
+      appointmentStatus: "pending" as const,
+    };
+  }
+
+  return {
+    paymentStatus: "pending" as const,
+    appointmentStatus: "pending" as const,
+  };
+}
+
+function extractPixPaymentDetails(payload: any, appointmentId: string) {
+  const payment = payload?.transactions?.payments?.[0] ?? null;
+  const normalized = mapOrderStatus(payload?.status || "");
+
+  return {
+    appointmentId,
+    orderId: payload?.id ? String(payload.id) : "",
+    paymentId: payment?.id ? String(payment.id) : null,
+    rawStatus: payload?.status_detail
+      ? `${payload.status}:${payload.status_detail}`
+      : payload?.status || "unknown",
+    paymentStatus: normalized.paymentStatus,
+    appointmentStatus: normalized.appointmentStatus,
+    ticketUrl: payment?.payment_method?.ticket_url || null,
+    qrCode: payment?.payment_method?.qr_code || null,
+    qrCodeBase64: payment?.payment_method?.qr_code_base64 || null,
+    expirationDate: payment?.date_of_expiration || null,
   };
 }
 
@@ -104,6 +161,91 @@ export function registerPaymentRoutes(app: Express) {
 
       res.status(500).json({
         message: error instanceof Error ? error.message : "Erro interno ao criar o pagamento.",
+      });
+    }
+  });
+
+  app.post("/api/payments/mercadopago/pix", async (req: Request, res: Response) => {
+    try {
+      const input = createPixPaymentSchema.parse(req.body);
+      const response = await fetch("https://api.mercadopago.com/v1/orders", {
+        method: "POST",
+        headers: getMercadoPagoHeaders(crypto.randomUUID()),
+        body: JSON.stringify({
+          type: "online",
+          external_reference: input.appointmentId,
+          processing_mode: "automatic",
+          total_amount: input.transactionAmount.toFixed(2),
+          payer: {
+            email: input.payer.email,
+            first_name: input.payer.firstName,
+            last_name: input.payer.lastName,
+          },
+          transactions: {
+            payments: [
+              {
+                amount: input.transactionAmount.toFixed(2),
+                payment_method: {
+                  id: "pix",
+                  type: "bank_transfer",
+                },
+                expiration_time: "PT30M",
+              },
+            ],
+          },
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        res.status(response.status).json({
+          message: payload?.message || "Nao foi possivel gerar o Pix.",
+          details: payload,
+        });
+        return;
+      }
+
+      res.json(extractPixPaymentDetails(payload, input.appointmentId));
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Dados invalidos para gerar o Pix.", issues: error.issues });
+        return;
+      }
+
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Erro interno ao gerar o Pix.",
+      });
+    }
+  });
+
+  app.post("/api/payments/mercadopago/pix/verify", async (req: Request, res: Response) => {
+    try {
+      const input = verifyPixPaymentSchema.parse(req.body);
+      const response = await fetch(`https://api.mercadopago.com/v1/orders/${input.orderId}`, {
+        method: "GET",
+        headers: getMercadoPagoHeaders(),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        res.status(response.status).json({
+          message: payload?.message || "Nao foi possivel verificar o Pix.",
+          details: payload,
+        });
+        return;
+      }
+
+      res.json(extractPixPaymentDetails(payload, input.appointmentId));
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Dados invalidos para verificar o Pix.", issues: error.issues });
+        return;
+      }
+
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Erro interno ao verificar o Pix.",
       });
     }
   });

@@ -122,14 +122,10 @@ export default function ProfessionalHomeScreen() {
 
                 updateStatusMutation.mutate({ appointmentId: item.id, status: "confirmed" });
               }}
-              disabled={updateStatusMutation.isPending || item.payment_status !== "paid"}
+              disabled={updateStatusMutation.isPending}
             >
               <Text className="text-white font-semibold text-center">
-                {item.payment_status !== "paid"
-                  ? "Aguardando pagamento"
-                  : updateStatusMutation.isPending
-                    ? "Salvando..."
-                    : "Confirmar"}
+                {updateStatusMutation.isPending ? "Salvando..." : "Confirmar Consulta"}
               </Text>
             </Pressable>
             <Pressable

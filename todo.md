@@ -137,6 +137,7 @@
 - [x] Ligar acoes rapidas da home do profissional
 - [x] Evitar toques repetidos nas acoes de confirmar, recusar e cancelar consultas
 - [x] Melhorar feedback de sucesso e erro nas acoes principais de consulta
+- [x] Manter o botao `Confirmar Consulta` visivel para o profissional mesmo antes do pagamento
 - [x] Criar fluxo de pagamento com Mercado Pago via Checkout Pro
 - [x] Abrir checkout do pagamento antes de confirmar a consulta
 - [x] Confirmar consulta apenas apos retorno com pagamento aprovado
