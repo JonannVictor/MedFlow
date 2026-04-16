@@ -121,6 +121,9 @@
 - [x] Garantir criacao automatica do registro profissional antes de salvar agenda
 - [x] Corrigir erro de ordem de hooks na tela de agendamento do paciente
 - [x] Corrigir script `dev:metro` para subir corretamente no Windows
+- [x] Corrigir selecao de datas do agendamento para nao mudar o dia por causa do fuso
+- [x] Ocultar horarios ja reservados da tela de agendamento
+- [x] Bloquear criacao de consulta em horario indisponivel ou ja ocupado
 - [ ] Aplicar `supabase/schema.sql` no projeto Supabase remoto
 - [ ] Popular `public.professionals` com pelo menos um profissional real para validar o fluxo do paciente
 - [ ] Investigar instabilidade do `dev:server` ao subir fora do sandbox (`exit code 3221225786`)

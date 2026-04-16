@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { Linking } from "react-native";
 
 export type AppointmentStatus =
   | "pending"
@@ -15,6 +16,7 @@ export type ProfessionalRecord = {
   price: number;
   location: string | null;
   crm: string;
+  meeting_url: string | null;
   rating: number | null;
   created_at?: string;
   updated_at?: string;
@@ -30,6 +32,7 @@ export type AppointmentRecord = {
   price: number;
   date: string;
   time: string;
+  meeting_url: string | null;
   status: AppointmentStatus;
   created_at?: string;
   updated_at?: string;
@@ -43,6 +46,7 @@ export type ProfessionalProfileFormData = {
   crm: string;
   bio: string;
   price: string;
+  meetingUrl: string;
 };
 
 export type AvailabilityRecord = {
@@ -63,6 +67,7 @@ type ProfessionalProfileInput = {
   bio?: string;
   location?: string;
   price?: number;
+  meetingUrl?: string;
   rating?: number | null;
 };
 
@@ -79,9 +84,12 @@ type CreateAppointmentInput = {
   professionalName?: string;
   specialty?: string;
   price?: number;
+  meetingUrl?: string | null;
   date: string;
   time: string;
 };
+
+type AppointmentConflictStatus = "pending" | "confirmed";
 
 function toMessage(error: unknown, fallback: string) {
   if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
@@ -378,6 +386,36 @@ export async function replaceProfessionalAvailability(
 }
 
 export async function createAppointment(input: CreateAppointmentInput) {
+  const [professionalAvailability, existingAppointments] = await Promise.all([
+    listProfessionalAvailability(input.professionalId),
+    listProfessionalAppointments(input.professionalId),
+  ]);
+
+  const selectedDate = parseDateOnlyString(input.date);
+  const selectedDayOfWeek = toStoredDayOfWeek(selectedDate);
+  const availableTimeSlots = generateAvailableTimeSlots(professionalAvailability, selectedDayOfWeek);
+
+  if (!availableTimeSlots.includes(input.time)) {
+    throw new Error("Esse horario nao esta mais disponivel para o profissional.");
+  }
+
+  const hasConflict = existingAppointments.some((appointment) => {
+    const isSameSlot =
+      appointment.date === input.date &&
+      appointment.time === input.time &&
+      appointment.professional_id === input.professionalId;
+
+    const blocksSlot = (["pending", "confirmed"] as AppointmentConflictStatus[]).includes(
+      appointment.status as AppointmentConflictStatus,
+    );
+
+    return isSameSlot && blocksSlot;
+  });
+
+  if (hasConflict) {
+    throw new Error("Esse horario acabou de ser reservado. Escolha outro horario.");
+  }
+
   const payload = {
     patient_id: input.patientId,
     patient_name: input.patientName ?? null,
@@ -453,6 +491,19 @@ export function buildAppointmentDateTime(date: string, time: string) {
   return new Date(`${date}T${time}:00`);
 }
 
+export function formatDateOnlyString(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+export function parseDateOnlyString(dateString: string) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, (month || 1) - 1, day || 1);
+}
+
 export function toStoredDayOfWeek(date: Date) {
   const jsDayOfWeek = date.getDay();
   return jsDayOfWeek === 0 ? 6 : jsDayOfWeek - 1;
@@ -485,4 +536,26 @@ export function generateAvailableTimeSlots(
     .flatMap((item) => generateTimeSlotsFromRange(item.start_time, item.end_time));
 
   return Array.from(new Set(daySlots)).sort((a, b) => a.localeCompare(b));
+}
+
+export function filterBookedTimeSlots(
+  availableTimeSlots: string[],
+  appointments: AppointmentRecord[],
+  selectedDate: string,
+) {
+  if (!selectedDate) {
+    return availableTimeSlots;
+  }
+
+  const bookedTimes = new Set(
+    appointments
+      .filter(
+        (appointment) =>
+          appointment.date === selectedDate &&
+          (appointment.status === "pending" || appointment.status === "confirmed"),
+      )
+      .map((appointment) => appointment.time),
+  );
+
+  return availableTimeSlots.filter((time) => !bookedTimes.has(time));
 }

@@ -7,10 +7,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
 import {
   createAppointment,
+  filterBookedTimeSlots,
+  formatDateOnlyString,
   generateAvailableTimeSlots,
   getProfessionalById,
   listProfessionalAvailability,
+  listProfessionalAppointments,
   medflowQueryKeys,
+  parseDateOnlyString,
   toStoredDayOfWeek,
 } from "@/lib/medflow-supabase";
 
@@ -32,6 +36,11 @@ export default function ProfessionalDetailScreen() {
   const { data: availability = [], isLoading: availabilityLoading } = useQuery({
     queryKey: medflowQueryKeys.professionalAvailability(professionalId),
     queryFn: () => listProfessionalAvailability(professionalId),
+    enabled: Boolean(professionalId),
+  });
+  const { data: professionalAppointments = [], isLoading: appointmentsLoading } = useQuery({
+    queryKey: medflowQueryKeys.professionalAppointments(professionalId),
+    queryFn: () => listProfessionalAppointments(professionalId),
     enabled: Boolean(professionalId),
   });
 
@@ -78,12 +87,16 @@ export default function ProfessionalDetailScreen() {
     date.setDate(date.getDate() + i);
     return date;
   });
-  const selectedDateObject = selectedDate ? new Date(`${selectedDate}T00:00:00`) : null;
+  const selectedDateObject = selectedDate ? parseDateOnlyString(selectedDate) : null;
   const selectedStoredDay = selectedDateObject ? toStoredDayOfWeek(selectedDateObject) : null;
-  const availableTimeSlots = useMemo(() => {
+  const baseAvailableTimeSlots = useMemo(() => {
     if (selectedStoredDay === null) return [];
     return generateAvailableTimeSlots(availability, selectedStoredDay);
   }, [availability, selectedStoredDay]);
+  const availableTimeSlots = useMemo(
+    () => filterBookedTimeSlots(baseAvailableTimeSlots, professionalAppointments, selectedDate),
+    [baseAvailableTimeSlots, professionalAppointments, selectedDate],
+  );
   const morningSlots = availableTimeSlots.filter((time) => Number(time.split(":")[0]) < 12);
   const afternoonSlots = availableTimeSlots.filter((time) => Number(time.split(":")[0]) >= 12);
 
@@ -91,7 +104,7 @@ export default function ProfessionalDetailScreen() {
     setSelectedTime("");
   }, [selectedDate]);
 
-  if (authLoading || isLoading || availabilityLoading) {
+  if (authLoading || isLoading || availabilityLoading || appointmentsLoading) {
     return (
       <ScreenContainer className="items-center justify-center">
         <ActivityIndicator size="large" color={colors.primary} />
@@ -173,7 +186,7 @@ export default function ProfessionalDetailScreen() {
 
               <View className="gap-2">
                 {nextDays.map((date, i) => {
-                  const dateStr = date.toISOString().split("T")[0];
+                  const dateStr = formatDateOnlyString(date);
                   const isSelected = selectedDate === dateStr;
 
                   return (
