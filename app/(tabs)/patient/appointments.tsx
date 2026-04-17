@@ -1,13 +1,12 @@
-import { ScrollView, Text, View, Pressable, FlatList, ActivityIndicator, Alert, Modal, Image, Linking } from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
+import { ScrollView, Text, View, Pressable, FlatList, ActivityIndicator, Alert } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
 import { openMeetingUrl } from "@/lib/meeting-links";
 import {
-  createMercadoPagoPixPayment,
-  type MercadoPagoPixResponse,
-  verifyMercadoPagoPixPayment,
+  createMercadoPagoPreference,
+  openMercadoPagoCheckout,
 } from "@/lib/mercado-pago";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -61,10 +60,8 @@ function needsPayment(item: AppointmentRecord) {
 export default function PatientAppointmentsScreen() {
   const colors = useColors();
   const { user, loading } = useUnifiedAuth();
-  const params = useLocalSearchParams<{ openPixAppointmentId?: string }>();
+  const params = useLocalSearchParams<{ openPaymentAppointmentId?: string }>();
   const [selectedTab, setSelectedTab] = useState<"upcoming" | "completed">("upcoming");
-  const [pixPayment, setPixPayment] = useState<MercadoPagoPixResponse | null>(null);
-  const [pixAppointmentId, setPixAppointmentId] = useState<string | null>(null);
   const autoOpenedAppointmentId = useRef<string | null>(null);
   const queryClient = useQueryClient();
   const { data: appointments = [], isLoading } = useQuery({
@@ -93,37 +90,29 @@ export default function PatientAppointmentsScreen() {
       console.log("[PatientAppointments] Pay button pressed", {
         appointmentId: appointment.id,
         paymentStatus: appointment.payment_status,
-        hasOrderId: Boolean(appointment.payment_preference_id),
+        hasCheckoutUrl: Boolean(appointment.payment_checkout_url),
       });
 
-      if (!user?.email) {
-        throw new Error("Seu usuario precisa ter um e-mail para gerar o Pix.");
+      if (appointment.payment_checkout_url && appointment.payment_status === "pending") {
+        return {
+          preferenceId: appointment.payment_preference_id || "",
+          checkoutUrl: appointment.payment_checkout_url,
+        };
       }
 
-      if (appointment.payment_preference_id && appointment.payment_status === "pending") {
-        return verifyMercadoPagoPixPayment({
-          appointmentId: appointment.id,
-          orderId: appointment.payment_preference_id,
-        });
-      }
-
-      return createMercadoPagoPixPayment({
+      return createMercadoPagoPreference({
         appointmentId: appointment.id,
-        description: `Consulta medica com ${appointment.professional_name || "profissional"}`,
-        transactionAmount: appointment.price / 100,
-        payer: {
-          email: user.email,
-          firstName: user.name?.split(" ")[0] || undefined,
-        },
+        title: "Consulta medica",
+        description: appointment.professional_name || "Profissional",
+        unitPrice: appointment.price / 100,
       });
     },
     onSuccess: async (payment, appointment) => {
       await updateAppointmentPaymentMetadata(appointment.id, {
-        paymentPreferenceId: payment.orderId,
-        paymentCheckoutUrl: payment.ticketUrl,
-        paymentId: payment.paymentId,
-        paymentStatus: payment.paymentStatus,
-        status: payment.appointmentStatus,
+        paymentPreferenceId: payment.preferenceId || appointment.payment_preference_id,
+        paymentCheckoutUrl: payment.checkoutUrl,
+        paymentStatus: "pending",
+        status: "pending",
       });
 
       if (user) {
@@ -132,61 +121,10 @@ export default function PatientAppointmentsScreen() {
         });
       }
 
-      if (payment.paymentStatus === "paid") {
-        Alert.alert("Pagamento confirmado", "Sua consulta foi confirmada com sucesso.");
-        return;
-      }
-
-      setPixPayment(payment);
-      setPixAppointmentId(appointment.id);
+      await openMercadoPagoCheckout(payment.checkoutUrl);
     },
     onError: (error) => {
       Alert.alert("Erro ao abrir pagamento", error.message);
-    },
-  });
-
-  const verifyPixMutation = useMutation({
-    mutationFn: async () => {
-      if (!pixPayment || !pixAppointmentId) {
-        throw new Error("Nenhum Pix ativo para verificar.");
-      }
-
-      return verifyMercadoPagoPixPayment({
-        appointmentId: pixAppointmentId,
-        orderId: pixPayment.orderId,
-      });
-    },
-    onSuccess: async (payment) => {
-      if (!pixAppointmentId) {
-        return;
-      }
-
-      await updateAppointmentPaymentMetadata(pixAppointmentId, {
-        paymentPreferenceId: payment.orderId,
-        paymentCheckoutUrl: payment.ticketUrl,
-        paymentId: payment.paymentId,
-        paymentStatus: payment.paymentStatus,
-        status: payment.appointmentStatus,
-      });
-
-      setPixPayment(payment);
-
-      if (user) {
-        await queryClient.invalidateQueries({
-          queryKey: medflowQueryKeys.patientAppointments(user.id),
-        });
-      }
-
-      if (payment.paymentStatus === "paid") {
-        setPixPayment(null);
-        setPixAppointmentId(null);
-        Alert.alert("Pagamento confirmado", "Sua consulta foi confirmada com sucesso.");
-      } else {
-        Alert.alert("Pagamento pendente", "Ainda nao identificamos o Pix. Se voce ja pagou, tente novamente em alguns segundos.");
-      }
-    },
-    onError: (error) => {
-      Alert.alert("Erro ao verificar Pix", error.message);
     },
   });
 
@@ -198,7 +136,7 @@ export default function PatientAppointmentsScreen() {
   });
 
   useEffect(() => {
-    const appointmentId = typeof params.openPixAppointmentId === "string" ? params.openPixAppointmentId : "";
+    const appointmentId = typeof params.openPaymentAppointmentId === "string" ? params.openPaymentAppointmentId : "";
 
     if (!appointmentId || autoOpenedAppointmentId.current === appointmentId || appointments.length === 0) {
       return;
@@ -213,7 +151,7 @@ export default function PatientAppointmentsScreen() {
     autoOpenedAppointmentId.current = appointmentId;
     setSelectedTab("upcoming");
     paymentMutation.mutate(appointment);
-  }, [appointments, params.openPixAppointmentId, paymentMutation]);
+  }, [appointments, params.openPaymentAppointmentId, paymentMutation]);
 
   if (loading || isLoading) {
     return (
@@ -299,8 +237,8 @@ export default function PatientAppointmentsScreen() {
               <Text className="text-white font-semibold text-center">
                 {needsPayment(item)
                   ? paymentMutation.isPending
-                    ? "Carregando Pix..."
-                    : "Ver QR Pix"
+                    ? "Abrindo pagamento..."
+                    : "Pagar"
                   : "Entrar na Consulta"}
               </Text>
             </Pressable>
@@ -321,96 +259,6 @@ export default function PatientAppointmentsScreen() {
 
   return (
     <ScreenContainer className="bg-background">
-      <Modal
-        visible={Boolean(pixPayment)}
-        animationType="slide"
-        transparent
-        onRequestClose={() => {
-          setPixPayment(null);
-          setPixAppointmentId(null);
-        }}
-      >
-        <View className="flex-1 bg-black/70 justify-end">
-          <View className="bg-background rounded-t-3xl px-5 pt-5 pb-8 gap-4 max-h-[90%]">
-            <View className="flex-row items-start justify-between">
-              <View className="flex-1 pr-4 gap-1">
-                <Text className="text-2xl font-bold text-foreground">Pague com Pix</Text>
-                <Text className="text-sm text-muted">
-                  Escaneie o QR Code no app do seu banco ou copie o codigo Pix abaixo.
-                </Text>
-              </View>
-              <Pressable
-                className="bg-surface border border-border rounded-full px-4 py-2"
-                onPress={() => {
-                  setPixPayment(null);
-                  setPixAppointmentId(null);
-                }}
-              >
-                <Text className="text-sm font-semibold text-foreground">Fechar</Text>
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View className="gap-4 pb-2">
-                {pixPayment?.qrCodeBase64 ? (
-                  <View className="items-center">
-                    <View className="bg-white rounded-2xl p-4">
-                      <Image
-                        source={{ uri: `data:image/png;base64,${pixPayment.qrCodeBase64}` }}
-                        style={{ width: 220, height: 220 }}
-                      />
-                    </View>
-                  </View>
-                ) : (
-                  <View className="bg-surface border border-border rounded-2xl p-4">
-                    <Text className="text-sm text-muted">
-                      O QR Code ainda nao ficou disponivel. Voce pode usar o codigo Pix ou verificar novamente.
-                    </Text>
-                  </View>
-                )}
-
-                {pixPayment?.expirationDate && (
-                  <View className="bg-surface border border-border rounded-xl px-4 py-3">
-                    <Text className="text-xs text-muted">Validade</Text>
-                    <Text className="text-sm font-semibold text-foreground">
-                      {new Date(pixPayment.expirationDate).toLocaleString("pt-BR")}
-                    </Text>
-                  </View>
-                )}
-
-                <View className="bg-surface border border-border rounded-2xl p-4 gap-2">
-                  <Text className="text-sm font-semibold text-foreground">Codigo Pix</Text>
-                  <Text selectable className="text-xs text-muted leading-5">
-                    {pixPayment?.qrCode || "Codigo Pix indisponivel no momento."}
-                  </Text>
-                </View>
-
-                <View className="gap-2">
-                  <Pressable
-                    className="bg-primary rounded-xl py-3"
-                    onPress={() => verifyPixMutation.mutate()}
-                    disabled={verifyPixMutation.isPending}
-                  >
-                    <Text className="text-white font-semibold text-center">
-                      {verifyPixMutation.isPending ? "Verificando..." : "Ja paguei, verificar agora"}
-                    </Text>
-                  </Pressable>
-
-                  {pixPayment?.ticketUrl && (
-                    <Pressable
-                      className="bg-surface border border-border rounded-xl py-3"
-                      onPress={() => Linking.openURL(pixPayment.ticketUrl!)}
-                    >
-                      <Text className="text-foreground font-semibold text-center">Abrir link do pagamento</Text>
-                    </Pressable>
-                  )}
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="flex-1">
         <View className="gap-6 px-4 py-6">
           <View className="gap-2">

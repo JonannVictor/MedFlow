@@ -2,7 +2,7 @@ import { ScrollView, Text, View, Pressable, ActivityIndicator, Alert } from "rea
 import { useLocalSearchParams, router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { createMercadoPagoPixPayment } from "@/lib/mercado-pago";
+import { createMercadoPagoPreference } from "@/lib/mercado-pago";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
@@ -69,26 +69,18 @@ export default function ProfessionalDetailScreen() {
       });
 
       try {
-        if (!user.email) {
-          throw new Error("Seu usuario precisa ter um e-mail para gerar o Pix.");
-        }
-
-        const pixPayment = await createMercadoPagoPixPayment({
+        const payment = await createMercadoPagoPreference({
           appointmentId: appointment.id,
-          description: `Consulta medica com ${professional.name}`,
-          transactionAmount: professional.price / 100,
-          payer: {
-            email: user.email,
-            firstName: user.name?.split(" ")[0] || undefined,
-          },
+          title: "Consulta medica",
+          description: professional.name,
+          unitPrice: professional.price / 100,
         });
 
         await updateAppointmentPaymentMetadata(appointment.id, {
-          paymentPreferenceId: pixPayment.orderId,
-          paymentCheckoutUrl: pixPayment.ticketUrl,
-          paymentId: pixPayment.paymentId,
-          paymentStatus: pixPayment.paymentStatus,
-          status: pixPayment.appointmentStatus,
+          paymentPreferenceId: payment.preferenceId,
+          paymentCheckoutUrl: payment.checkoutUrl,
+          paymentStatus: "pending",
+          status: "pending",
         });
       } catch (error) {
         await updateAppointmentPaymentMetadata(appointment.id, {
@@ -112,7 +104,7 @@ export default function ProfessionalDetailScreen() {
       router.replace({
         pathname: "/(tabs)/patient/appointments" as any,
         params: {
-          openPixAppointmentId: appointment.id,
+          openPaymentAppointmentId: appointment.id,
         },
       });
     },
@@ -458,7 +450,7 @@ export default function ProfessionalDetailScreen() {
                   {createAppointmentMutation.isPending ? (
                     <ActivityIndicator color="white" />
                   ) : (
-                    <Text className="text-base font-semibold text-white">Gerar Pix da Consulta</Text>
+                    <Text className="text-base font-semibold text-white">Pagar Consulta</Text>
                   )}
                 </Pressable>
               </View>

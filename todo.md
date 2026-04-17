@@ -142,6 +142,7 @@
 - [x] Abrir checkout do pagamento antes de confirmar a consulta
 - [x] Confirmar consulta apenas apos retorno com pagamento aprovado
 - [x] Preparar colunas e envs para status e referencia de pagamento
+- [x] Trocar o fluxo do paciente de Pix dedicado para checkout com multiplas formas de pagamento
 - [x] Aplicar `supabase/schema.sql` no projeto Supabase remoto
 - [x] Popular `public.professionals` com pelo menos um profissional real para validar o fluxo do paciente
 - [ ] Investigar instabilidade do `dev:server` ao subir fora do sandbox (`exit code 3221225786`)
