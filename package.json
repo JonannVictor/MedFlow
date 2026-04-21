@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node scripts/inject-env.js && concurrently -k \"npm run dev:server\" \"npm run dev:mobile\"",
     "dev:server": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
-    "dev:mobile": "cross-env EXPO_USE_METRO_WORKSPACE_ROOT=1 EXPO_PORT=11000 expo start --port 11000",
+    "dev:mobile": "cross-env EXPO_USE_METRO_WORKSPACE_ROOT=1 EXPO_PORT=11000 expo start --port 11000 --tunnel",
+    "dev:lan": "cross-env EXPO_USE_METRO_WORKSPACE_ROOT=1 EXPO_PORT=11000 expo start --port 11000 --lan",
     "dev:web": "cross-env EXPO_USE_METRO_WORKSPACE_ROOT=1 EXPO_PORT=11000 expo start --web --port 11000",
     "build": "esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",

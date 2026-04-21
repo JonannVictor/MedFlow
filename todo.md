@@ -35,6 +35,8 @@
 - [x] Implementar componentes reutilizaveis
 - [x] Garantir consistencia visual
 - [ ] Testar modo claro/escuro
+- [x] Criar base visual inicial com Button, Card, Input, Badge, Header, EmptyState e StatCard
+- [x] Aplicar primeira camada de estilo em Landing e Login
 
 ## Fase 6: Refinamentos
 - [ ] Validacoes de formularios
@@ -143,6 +145,7 @@
 - [x] Confirmar consulta apenas apos retorno com pagamento aprovado
 - [x] Preparar colunas e envs para status e referencia de pagamento
 - [x] Trocar o fluxo do paciente de Pix dedicado para checkout com multiplas formas de pagamento
+- [x] Usar Expo `--tunnel` como caminho principal para testar o app no celular
 - [x] Aplicar `supabase/schema.sql` no projeto Supabase remoto
 - [x] Popular `public.professionals` com pelo menos um profissional real para validar o fluxo do paciente
 - [ ] Investigar instabilidade do `dev:server` ao subir fora do sandbox (`exit code 3221225786`)
