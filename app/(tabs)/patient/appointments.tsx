@@ -1,15 +1,13 @@
-import { ScrollView, Text, View, Pressable, FlatList, ActivityIndicator, Alert } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ScreenContainer } from "@/components/screen-container";
+import { Badge, Button, Card, EmptyState, ScreenHeader } from "@/components/ui/medflow";
 import { useColors } from "@/hooks/use-colors";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
 import { openMeetingUrl } from "@/lib/meeting-links";
-import {
-  createMercadoPagoPreference,
-  openMercadoPagoCheckout,
-} from "@/lib/mercado-pago";
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createMercadoPagoPreference, openMercadoPagoCheckout } from "@/lib/mercado-pago";
 import {
   buildAppointmentDateTime,
   listPatientAppointments,
@@ -18,21 +16,6 @@ import {
   updateAppointmentPaymentMetadata,
   updateAppointmentStatus,
 } from "@/lib/medflow-supabase";
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "pending":
-      return "#F59E0B";
-    case "confirmed":
-      return "#0066CC";
-    case "completed":
-      return "#22C55E";
-    case "cancelled":
-      return "#EF4444";
-    default:
-      return "#687076";
-  }
-};
 
 const getStatusLabel = (status: string) => {
   switch (status) {
@@ -46,6 +29,21 @@ const getStatusLabel = (status: string) => {
       return "Cancelada";
     default:
       return "Desconhecido";
+  }
+};
+
+const getStatusTone = (status: string): "neutral" | "primary" | "success" | "warning" | "error" => {
+  switch (status) {
+    case "pending":
+      return "warning";
+    case "confirmed":
+      return "primary";
+    case "completed":
+      return "success";
+    case "cancelled":
+      return "error";
+    default:
+      return "neutral";
   }
 };
 
@@ -183,103 +181,104 @@ export default function PatientAppointmentsScreen() {
   };
 
   const renderAppointmentCard = ({ item }: { item: AppointmentRecord }) => (
-    <View className="bg-surface rounded-2xl p-4 mb-3 border border-border">
-      <View className="gap-3">
-        <View className="flex-row justify-between items-start">
-          <View className="flex-1">
-            <Text className="text-lg font-bold text-foreground">{item.professional_name || "Profissional"}</Text>
-            <Text className="text-sm text-muted">{item.specialty || "Consulta"}</Text>
-          </View>
-          <View className="rounded-full px-3 py-1" style={{ backgroundColor: getStatusColor(item.status) }}>
-            <Text className="text-white text-xs font-semibold">{getStatusLabel(item.status)}</Text>
-          </View>
+    <Card className="mb-4 gap-4">
+      <View className="flex-row items-start justify-between">
+        <View className="flex-1 pr-3">
+          <Text className="text-xl font-extrabold text-foreground">{item.professional_name || "Profissional"}</Text>
+          <Text className="mt-1 text-sm font-semibold text-muted">{item.specialty || "Consulta"}</Text>
         </View>
-
-        {needsPayment(item) && (
-          <View className="bg-amber-500/15 border border-amber-500/30 rounded-lg px-3 py-2">
-            <Text className="text-xs font-semibold text-foreground">
-              Pagamento pendente. Quite a consulta para o medico conseguir confirmar.
-            </Text>
-          </View>
-        )}
-
-        <View className="flex-row gap-4 bg-background rounded-lg p-3">
-          <View className="flex-1">
-            <Text className="text-xs text-muted mb-1">Data</Text>
-            <Text className="text-sm font-semibold text-foreground">
-              {buildAppointmentDateTime(item.date, item.time).toLocaleDateString("pt-BR")}
-            </Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-xs text-muted mb-1">Horario</Text>
-            <Text className="text-sm font-semibold text-foreground">{item.time}</Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-xs text-muted mb-1">Valor</Text>
-            <Text className="text-sm font-semibold text-primary">R$ {(item.price / 100).toFixed(2)}</Text>
-          </View>
-        </View>
-
-        {isUpcomingAppointment(item) && (
-          <View className="flex-row gap-2">
-            <Pressable
-              className={`flex-1 rounded-lg py-2 ${needsPayment(item) ? "bg-success" : "bg-primary"}`}
-              onPress={() => {
-                if (needsPayment(item)) {
-                  paymentMutation.mutate(item);
-                  return;
-                }
-
-                handleJoinAppointment(item);
-              }}
-              disabled={paymentMutation.isPending}
-            >
-              <Text className="text-white font-semibold text-center">
-                {needsPayment(item)
-                  ? paymentMutation.isPending
-                    ? "Abrindo pagamento..."
-                    : "Pagar"
-                  : "Entrar na Consulta"}
-              </Text>
-            </Pressable>
-            <Pressable
-              className="flex-1 bg-error rounded-lg py-2"
-              onPress={() => cancelMutation.mutate(item.id)}
-              disabled={cancelMutation.isPending}
-            >
-              <Text className="text-white font-semibold text-center">
-                {cancelMutation.isPending ? "Cancelando..." : "Cancelar"}
-              </Text>
-            </Pressable>
-          </View>
-        )}
+        <Badge label={getStatusLabel(item.status)} tone={getStatusTone(item.status)} />
       </View>
-    </View>
+
+      {needsPayment(item) ? (
+        <View className="rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3">
+          <Text className="text-sm font-semibold text-foreground">
+            Pagamento pendente. Quite a consulta para o medico conseguir confirmar.
+          </Text>
+        </View>
+      ) : null}
+
+      <View className="flex-row gap-3 rounded-2xl bg-background p-4">
+        <View className="flex-1">
+          <Text className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted">Data</Text>
+          <Text className="text-sm font-bold text-foreground">
+            {buildAppointmentDateTime(item.date, item.time).toLocaleDateString("pt-BR")}
+          </Text>
+        </View>
+        <View className="flex-1">
+          <Text className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted">Horario</Text>
+          <Text className="text-sm font-bold text-foreground">{item.time}</Text>
+        </View>
+        <View className="flex-1">
+          <Text className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted">Valor</Text>
+          <Text className="text-sm font-bold text-primary">R$ {(item.price / 100).toFixed(2)}</Text>
+        </View>
+      </View>
+
+      {isUpcomingAppointment(item) ? (
+        <View className="flex-row gap-3">
+          <Button
+            title={
+              needsPayment(item)
+                ? paymentMutation.isPending
+                  ? "Abrindo pagamento..."
+                  : "Pagar"
+                : "Entrar na Consulta"
+            }
+            variant={needsPayment(item) ? "success" : "primary"}
+            className="flex-1 min-h-0 rounded-xl py-3"
+            textClassName="text-sm"
+            onPress={() => {
+              if (needsPayment(item)) {
+                paymentMutation.mutate(item);
+                return;
+              }
+
+              handleJoinAppointment(item);
+            }}
+            disabled={paymentMutation.isPending}
+          />
+          <Button
+            title={cancelMutation.isPending ? "Cancelando..." : "Cancelar"}
+            variant="danger"
+            className="flex-1 min-h-0 rounded-xl py-3"
+            textClassName="text-sm"
+            onPress={() => cancelMutation.mutate(item.id)}
+            disabled={cancelMutation.isPending}
+          />
+        </View>
+      ) : null}
+    </Card>
   );
 
   return (
     <ScreenContainer className="bg-background">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="flex-1">
         <View className="gap-6 px-4 py-6">
-          <View className="gap-2">
-            <Text className="text-3xl font-bold text-foreground">Minhas Consultas</Text>
-            <Text className="text-base text-muted">Acompanhe suas consultas agendadas</Text>
-          </View>
+          <ScreenHeader
+            eyebrow="Paciente"
+            title="Minhas consultas"
+            subtitle="Acompanhe pagamentos, confirmacoes e acesso as consultas."
+          />
 
-          <View className="flex-row gap-2">
+          <View className="flex-row gap-3">
             <Pressable
-              className={`flex-1 rounded-lg py-2 ${selectedTab === "upcoming" ? "bg-primary" : "bg-surface border border-border"}`}
+              className={`flex-1 rounded-2xl py-4 ${
+                selectedTab === "upcoming" ? "bg-primary" : "border border-border bg-surface"
+              }`}
               onPress={() => setSelectedTab("upcoming")}
             >
-              <Text className={`text-center font-semibold ${selectedTab === "upcoming" ? "text-white" : "text-foreground"}`}>
+              <Text className={`text-center font-bold ${selectedTab === "upcoming" ? "text-white" : "text-foreground"}`}>
                 Proximas
               </Text>
             </Pressable>
             <Pressable
-              className={`flex-1 rounded-lg py-2 ${selectedTab === "completed" ? "bg-primary" : "bg-surface border border-border"}`}
+              className={`flex-1 rounded-2xl py-4 ${
+                selectedTab === "completed" ? "bg-primary" : "border border-border bg-surface"
+              }`}
               onPress={() => setSelectedTab("completed")}
             >
-              <Text className={`text-center font-semibold ${selectedTab === "completed" ? "text-white" : "text-foreground"}`}>
+              <Text className={`text-center font-bold ${selectedTab === "completed" ? "text-white" : "text-foreground"}`}>
                 Concluidas
               </Text>
             </Pressable>
@@ -293,14 +292,14 @@ export default function PatientAppointmentsScreen() {
               scrollEnabled={false}
             />
           ) : (
-            <View className="items-center justify-center py-12 gap-2">
-              <Text className="text-lg font-semibold text-foreground">
-                {selectedTab === "upcoming" ? "Nenhuma consulta proxima" : "Nenhuma consulta concluida"}
-              </Text>
-              <Text className="text-sm text-muted">
-                {selectedTab === "upcoming" ? "Agende uma consulta agora" : "Suas consultas concluidas aparecerao aqui"}
-              </Text>
-            </View>
+            <EmptyState
+              title={selectedTab === "upcoming" ? "Nenhuma consulta proxima" : "Nenhuma consulta concluida"}
+              subtitle={
+                selectedTab === "upcoming"
+                  ? "Quando voce agendar uma consulta, ela aparecera aqui."
+                  : "Seu historico de consultas finalizadas ficara neste espaco."
+              }
+            />
           )}
         </View>
       </ScrollView>

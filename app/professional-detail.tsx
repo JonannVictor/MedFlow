@@ -1,10 +1,11 @@
-import { ScrollView, Text, View, Pressable, ActivityIndicator, Alert } from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
-import { ScreenContainer } from "@/components/screen-container";
-import { useColors } from "@/hooks/use-colors";
-import { createMercadoPagoPreference } from "@/lib/mercado-pago";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ScreenContainer } from "@/components/screen-container";
+import { Badge, Button, Card, EmptyState, ScreenHeader } from "@/components/ui/medflow";
+import { useColors } from "@/hooks/use-colors";
+import { createMercadoPagoPreference } from "@/lib/mercado-pago";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
 import {
   createAppointment,
@@ -19,6 +20,8 @@ import {
   updateAppointmentPaymentMetadata,
   toStoredDayOfWeek,
 } from "@/lib/medflow-supabase";
+
+const bookingSteps = ["info", "date", "time", "confirm"] as const;
 
 export default function ProfessionalDetailScreen() {
   const colors = useColors();
@@ -145,317 +148,228 @@ export default function ProfessionalDetailScreen() {
 
   if (!professional) {
     return (
-      <ScreenContainer className="items-center justify-center gap-4 px-6">
-        <Text className="text-2xl font-bold text-foreground">Profissional nao encontrado</Text>
+      <ScreenContainer className="items-center justify-center px-6">
+        <EmptyState title="Profissional nao encontrado" subtitle="Volte para a busca e selecione outro profissional." />
       </ScreenContainer>
     );
   }
+
+  const currentStepIndex = bookingSteps.indexOf(step);
+  const formattedSelectedDate = selectedDateObject
+    ? selectedDateObject.toLocaleDateString("pt-BR", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      })
+    : "";
 
   const handleBookAppointment = async () => {
     await createAppointmentMutation.mutateAsync();
   };
 
+  const renderTimeSlot = (time: string) => {
+    const isSelected = selectedTime === time;
+
+    return (
+      <Pressable
+        key={time}
+        onPress={() => setSelectedTime(time)}
+        className={`rounded-2xl border px-5 py-3 ${
+          isSelected ? "border-primary bg-primary" : "border-border bg-surface"
+        }`}
+        style={({ pressed }) => [pressed ? { opacity: 0.82, transform: [{ scale: 0.98 }] } : null]}
+      >
+        <Text className={`text-sm font-bold ${isSelected ? "text-white" : "text-foreground"}`}>{time}</Text>
+      </Pressable>
+    );
+  };
+
   return (
     <ScreenContainer className="bg-background">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="flex-1">
-        <View className="flex-1 gap-6 py-6 px-6">
-          <View className="flex-row gap-2 items-center justify-center">
-            {["info", "date", "time", "confirm"].map((s, i) => (
-              <View key={s} className="flex-row items-center gap-2">
-                <View
-                  className="w-8 h-8 rounded-full items-center justify-center"
-                  style={{
-                    backgroundColor:
-                      step === s || ["info", "date", "time", "confirm"].indexOf(step) > i
-                        ? colors.primary
-                        : colors.surface,
-                  }}
-                >
-                  <Text className="text-xs font-bold" style={{ color: step === s ? "white" : colors.muted }}>
-                    {i + 1}
-                  </Text>
+        <View className="flex-1 gap-6 px-6 py-6">
+          <View className="flex-row items-center justify-center gap-2">
+            {bookingSteps.map((stepName, index) => {
+              const isActive = step === stepName;
+              const isDone = currentStepIndex > index;
+
+              return (
+                <View key={stepName} className="flex-row items-center gap-2">
+                  <View
+                    className={`h-9 w-9 items-center justify-center rounded-full ${
+                      isActive || isDone ? "bg-primary" : "bg-surface"
+                    }`}
+                  >
+                    <Text className={`text-xs font-extrabold ${isActive || isDone ? "text-white" : "text-muted"}`}>
+                      {index + 1}
+                    </Text>
+                  </View>
+                  {index < bookingSteps.length - 1 ? <View className="h-0.5 w-5 bg-border" /> : null}
                 </View>
-                {i < 3 && <View className="w-4 h-0.5" style={{ backgroundColor: colors.border }} />}
-              </View>
-            ))}
+              );
+            })}
           </View>
 
-          {step === "info" && (
-            <View className="gap-4">
-              <View className="bg-surface border border-border rounded-2xl p-6 gap-4">
-                <View className="gap-2">
-                  <Text className="text-2xl font-bold text-foreground">{professional.specialty}</Text>
-                  <Text className="text-base text-muted">{professional.bio}</Text>
-                </View>
+          {step === "info" ? (
+            <View className="gap-5">
+              <ScreenHeader
+                eyebrow="Agendamento"
+                title={professional.name}
+                subtitle="Confira os detalhes antes de escolher o melhor horario."
+              />
 
-                <View className="flex-row justify-between items-center pt-2 border-t border-border">
-                  <Text className="text-sm text-muted">Valor da consulta</Text>
-                  <Text className="text-lg font-bold text-primary">
-                    R$ {(professional.price / 100).toFixed(2)}
+              <Card className="gap-4">
+                <View className="gap-2">
+                  <Badge label={professional.specialty} tone="primary" />
+                  <Text className="text-base leading-6 text-muted">
+                    {professional.bio || "Profissional disponivel para atendimento."}
                   </Text>
                 </View>
 
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-sm text-muted">Localizacao</Text>
-                  <Text className="text-sm font-semibold text-foreground">{professional.location}</Text>
+                <View className="gap-3 rounded-2xl bg-background p-4">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-sm font-semibold text-muted">Valor da consulta</Text>
+                    <Text className="text-xl font-extrabold text-primary">R$ {(professional.price / 100).toFixed(2)}</Text>
+                  </View>
+
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-sm font-semibold text-muted">Localizacao</Text>
+                    <Text className="max-w-[55%] text-right text-sm font-bold text-foreground">
+                      {professional.location || "Atendimento online"}
+                    </Text>
+                  </View>
                 </View>
-              </View>
+              </Card>
 
-              <Pressable
-                onPress={() => setStep("date")}
-                style={({ pressed }) => [{ backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 }]}
-                className="py-4 px-6 rounded-full items-center"
-              >
-                <Text className="text-base font-semibold text-white">Continuar</Text>
-              </Pressable>
+              <Button title="Continuar" onPress={() => setStep("date")} />
             </View>
-          )}
+          ) : null}
 
-          {step === "date" && (
-            <View className="gap-4">
-              <Text className="text-lg font-bold text-foreground">Selecione uma data</Text>
+          {step === "date" ? (
+            <View className="gap-5">
+              <ScreenHeader
+                eyebrow="Passo 2"
+                title="Selecione uma data"
+                subtitle="Mostramos os proximos dias disponiveis para este profissional."
+              />
 
-              <View className="gap-2">
-                {nextDays.map((date, i) => {
+              <View className="gap-3">
+                {nextDays.map((date) => {
                   const dateStr = formatDateOnlyString(date);
                   const isSelected = selectedDate === dateStr;
 
                   return (
                     <Pressable
-                      key={i}
+                      key={dateStr}
                       onPress={() => setSelectedDate(dateStr)}
-                      style={({ pressed }) => [
-                        {
-                          backgroundColor: isSelected ? colors.primary : colors.surface,
-                          borderColor: colors.border,
-                          borderWidth: 1,
-                          opacity: pressed ? 0.8 : 1,
-                        },
-                      ]}
-                      className="py-3 px-4 rounded-lg flex-row justify-between items-center"
+                      className={`flex-row items-center justify-between rounded-2xl border px-4 py-4 ${
+                        isSelected ? "border-primary bg-primary" : "border-border bg-surface"
+                      }`}
+                      style={({ pressed }) => [pressed ? { opacity: 0.82, transform: [{ scale: 0.99 }] } : null]}
                     >
-                      <Text className="font-semibold" style={{ color: isSelected ? "white" : colors.foreground }}>
+                      <Text className={`font-bold ${isSelected ? "text-white" : "text-foreground"}`}>
                         {date.toLocaleDateString("pt-BR", { weekday: "long", month: "short", day: "numeric" })}
                       </Text>
-                      {isSelected && <Text style={{ color: "white" }}>✓</Text>}
+                      {isSelected ? <Text className="font-extrabold text-white">OK</Text> : null}
                     </Pressable>
                   );
                 })}
               </View>
 
-              <View className="flex-row gap-2 pt-4">
-                <Pressable
-                  onPress={() => setStep("info")}
-                  style={({ pressed }) => [
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                      borderWidth: 1,
-                      opacity: pressed ? 0.8 : 1,
-                    },
-                  ]}
-                  className="flex-1 py-3 px-4 rounded-full items-center"
-                >
-                  <Text className="text-base font-semibold text-foreground">Voltar</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => setStep("time")}
-                  disabled={!selectedDate}
-                  style={({ pressed }) => [
-                    {
-                      backgroundColor: selectedDate ? colors.primary : colors.surface,
-                      opacity: pressed && selectedDate ? 0.9 : !selectedDate ? 0.5 : 1,
-                    },
-                  ]}
-                  className="flex-1 py-3 px-4 rounded-full items-center"
-                >
-                  <Text className="text-base font-semibold" style={{ color: selectedDate ? "white" : colors.muted }}>
-                    Continuar
-                  </Text>
-                </Pressable>
+              <View className="flex-row gap-3 pt-2">
+                <Button title="Voltar" variant="secondary" className="flex-1" onPress={() => setStep("info")} />
+                <Button title="Continuar" className="flex-1" onPress={() => setStep("time")} disabled={!selectedDate} />
               </View>
             </View>
-          )}
+          ) : null}
 
-          {step === "time" && (
-            <View className="gap-4">
-              <Text className="text-lg font-bold text-foreground">Selecione um horario</Text>
+          {step === "time" ? (
+            <View className="gap-5">
+              <ScreenHeader
+                eyebrow="Passo 3"
+                title="Selecione um horario"
+                subtitle="Os horarios abaixo vem da agenda real do profissional e ignoram horarios ja reservados."
+              />
 
-              <View className="gap-2">
-                <Text className="text-sm text-muted font-semibold">Manha</Text>
-                <View className="flex-row gap-2 flex-wrap">
-                  {morningSlots.map((time) => {
-                    const isSelected = selectedTime === time;
-                    return (
-                      <Pressable
-                        key={time}
-                        onPress={() => setSelectedTime(time)}
-                        style={({ pressed }) => [
-                          {
-                            backgroundColor: isSelected ? colors.primary : colors.surface,
-                            borderColor: colors.border,
-                            borderWidth: 1,
-                            opacity: pressed ? 0.8 : 1,
-                          },
-                        ]}
-                        className="px-4 py-2 rounded-lg"
-                      >
-                        <Text className="text-sm font-semibold" style={{ color: isSelected ? "white" : colors.foreground }}>
-                          {time}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <Text className="text-sm text-muted font-semibold mt-3">Tarde</Text>
-                <View className="flex-row gap-2 flex-wrap">
-                  {afternoonSlots.map((time) => {
-                    const isSelected = selectedTime === time;
-                    return (
-                      <Pressable
-                        key={time}
-                        onPress={() => setSelectedTime(time)}
-                        style={({ pressed }) => [
-                          {
-                            backgroundColor: isSelected ? colors.primary : colors.surface,
-                            borderColor: colors.border,
-                            borderWidth: 1,
-                            opacity: pressed ? 0.8 : 1,
-                          },
-                        ]}
-                        className="px-4 py-2 rounded-lg"
-                      >
-                        <Text className="text-sm font-semibold" style={{ color: isSelected ? "white" : colors.foreground }}>
-                          {time}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                {availableTimeSlots.length === 0 && (
-                  <View className="bg-surface border border-border rounded-lg p-4 mt-2">
-                    <Text className="text-sm text-muted">
-                      Nenhum horario disponivel para a data selecionada.
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              <View className="flex-row gap-2 pt-4">
-                <Pressable
-                  onPress={() => setStep("date")}
-                  style={({ pressed }) => [
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                      borderWidth: 1,
-                      opacity: pressed ? 0.8 : 1,
-                    },
-                  ]}
-                  className="flex-1 py-3 px-4 rounded-full items-center"
-                >
-                  <Text className="text-base font-semibold text-foreground">Voltar</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => setStep("confirm")}
-                  disabled={!selectedTime}
-                  style={({ pressed }) => [
-                    {
-                      backgroundColor: selectedTime ? colors.primary : colors.surface,
-                      opacity: pressed && selectedTime ? 0.9 : !selectedTime ? 0.5 : 1,
-                    },
-                  ]}
-                  className="flex-1 py-3 px-4 rounded-full items-center"
-                >
-                  <Text className="text-base font-semibold" style={{ color: selectedTime ? "white" : colors.muted }}>
-                    Continuar
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          )}
-
-          {step === "confirm" && (
-            <View className="gap-4">
-              <Text className="text-lg font-bold text-foreground">Confirme sua consulta</Text>
-
-              <View className="bg-surface border border-border rounded-2xl p-6 gap-4">
+              <Card className="gap-4">
                 <View className="gap-3">
-                  <View className="gap-1">
-                    <Text className="text-sm text-muted">Profissional</Text>
-                    <Text className="text-base font-semibold text-foreground">{professional.name}</Text>
-                  </View>
-
-                  <View className="gap-1">
-                    <Text className="text-sm text-muted">Especialidade</Text>
-                    <Text className="text-base font-semibold text-foreground">{professional.specialty}</Text>
-                  </View>
-
-                  <View className="gap-1">
-                    <Text className="text-sm text-muted">Data</Text>
-                    <Text className="text-base font-semibold text-foreground">
-                      {new Date(selectedDate).toLocaleDateString("pt-BR", {
-                        weekday: "long",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </Text>
-                  </View>
-
-                  <View className="gap-1">
-                    <Text className="text-sm text-muted">Horario</Text>
-                    <Text className="text-base font-semibold text-foreground">{selectedTime}</Text>
-                  </View>
-
-                  <View className="gap-1 pt-2 border-t border-border">
-                    <Text className="text-sm text-muted">Valor</Text>
-                    <Text className="text-lg font-bold text-primary">
-                      R$ {(professional.price / 100).toFixed(2)}
-                    </Text>
+                  <Text className="text-sm font-bold uppercase tracking-widest text-muted">Manha</Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {morningSlots.length > 0 ? morningSlots.map(renderTimeSlot) : <Text className="text-sm text-muted">Sem horarios pela manha.</Text>}
                   </View>
                 </View>
-              </View>
 
-              <View className="flex-row gap-2 pt-4">
-                <Pressable
-                  onPress={() => setStep("time")}
-                  style={({ pressed }) => [
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                      borderWidth: 1,
-                      opacity: pressed ? 0.8 : 1,
-                    },
-                  ]}
-                  className="flex-1 py-3 px-4 rounded-full items-center"
-                >
-                  <Text className="text-base font-semibold text-foreground">Voltar</Text>
-                </Pressable>
+                <View className="gap-3">
+                  <Text className="text-sm font-bold uppercase tracking-widest text-muted">Tarde</Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {afternoonSlots.length > 0 ? afternoonSlots.map(renderTimeSlot) : <Text className="text-sm text-muted">Sem horarios pela tarde.</Text>}
+                  </View>
+                </View>
 
-                <Pressable
-                  onPress={handleBookAppointment}
-                  disabled={createAppointmentMutation.isPending}
-                  style={({ pressed }) => [
-                    {
-                      backgroundColor: colors.primary,
-                      opacity: pressed ? 0.9 : createAppointmentMutation.isPending ? 0.6 : 1,
-                    },
-                  ]}
-                  className="flex-1 py-3 px-4 rounded-full items-center"
-                >
-                  {createAppointmentMutation.isPending ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
-                    <Text className="text-base font-semibold text-white">Pagar Consulta</Text>
-                  )}
-                </Pressable>
+                {availableTimeSlots.length === 0 ? (
+                  <View className="rounded-2xl border border-border bg-background p-4">
+                    <Text className="text-sm leading-5 text-muted">Nenhum horario disponivel para a data selecionada.</Text>
+                  </View>
+                ) : null}
+              </Card>
+
+              <View className="flex-row gap-3 pt-2">
+                <Button title="Voltar" variant="secondary" className="flex-1" onPress={() => setStep("date")} />
+                <Button title="Continuar" className="flex-1" onPress={() => setStep("confirm")} disabled={!selectedTime} />
               </View>
             </View>
-          )}
+          ) : null}
+
+          {step === "confirm" ? (
+            <View className="gap-5">
+              <ScreenHeader
+                eyebrow="Passo 4"
+                title="Confirme sua consulta"
+                subtitle="Depois de confirmar, voce sera direcionado para o pagamento."
+              />
+
+              <Card className="gap-4">
+                <View className="gap-4 rounded-2xl bg-background p-4">
+                  <View className="gap-1">
+                    <Text className="text-xs font-semibold uppercase tracking-widest text-muted">Profissional</Text>
+                    <Text className="text-base font-bold text-foreground">{professional.name}</Text>
+                  </View>
+
+                  <View className="gap-1">
+                    <Text className="text-xs font-semibold uppercase tracking-widest text-muted">Especialidade</Text>
+                    <Text className="text-base font-bold text-foreground">{professional.specialty}</Text>
+                  </View>
+
+                  <View className="flex-row gap-3">
+                    <View className="flex-1 gap-1">
+                      <Text className="text-xs font-semibold uppercase tracking-widest text-muted">Data</Text>
+                      <Text className="text-sm font-bold text-foreground">{formattedSelectedDate}</Text>
+                    </View>
+                    <View className="flex-1 gap-1">
+                      <Text className="text-xs font-semibold uppercase tracking-widest text-muted">Horario</Text>
+                      <Text className="text-sm font-bold text-foreground">{selectedTime}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-sm font-semibold text-muted">Total</Text>
+                  <Text className="text-2xl font-extrabold text-primary">R$ {(professional.price / 100).toFixed(2)}</Text>
+                </View>
+              </Card>
+
+              <View className="flex-row gap-3 pt-2">
+                <Button title="Voltar" variant="secondary" className="flex-1" onPress={() => setStep("time")} />
+                <Button
+                  title="Pagar consulta"
+                  className="flex-1"
+                  onPress={handleBookAppointment}
+                  loading={createAppointmentMutation.isPending}
+                  disabled={createAppointmentMutation.isPending}
+                />
+              </View>
+            </View>
+          ) : null}
         </View>
       </ScrollView>
     </ScreenContainer>

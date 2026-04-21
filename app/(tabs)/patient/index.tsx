@@ -1,10 +1,11 @@
-import { ScrollView, Text, View, TextInput, Pressable, FlatList, ActivityIndicator } from "react-native";
+import { ActivityIndicator, FlatList, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
-import { ScreenContainer } from "@/components/screen-container";
-import { useColors } from "@/hooks/use-colors";
-import { useUnifiedAuth } from "@/hooks/use-unified-auth";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { ScreenContainer } from "@/components/screen-container";
+import { Badge, Button, Card, EmptyState, ScreenHeader, TextField } from "@/components/ui/medflow";
+import { useColors } from "@/hooks/use-colors";
+import { useUnifiedAuth } from "@/hooks/use-unified-auth";
 import { listProfessionals, medflowQueryKeys, type ProfessionalRecord } from "@/lib/medflow-supabase";
 
 export default function PatientHomeScreen() {
@@ -18,10 +19,11 @@ export default function PatientHomeScreen() {
   });
 
   useEffect(() => {
+    const normalizedSearch = searchText.toLowerCase();
     const filtered = professionals.filter(
       (prof) =>
-        prof.name.toLowerCase().includes(searchText.toLowerCase()) ||
-        prof.specialty.toLowerCase().includes(searchText.toLowerCase())
+        prof.name.toLowerCase().includes(normalizedSearch) ||
+        prof.specialty.toLowerCase().includes(normalizedSearch),
     );
     setFilteredProfessionals(filtered);
   }, [searchText, professionals]);
@@ -34,66 +36,65 @@ export default function PatientHomeScreen() {
     );
   }
 
-  const renderProfessionalCard = ({ item }: { item: ProfessionalRecord }) => (
-    <Pressable
-      className="bg-surface rounded-2xl p-4 mb-3 border border-border"
-      style={({ pressed }) => [pressed && { opacity: 0.7 }]}
-    >
-      <View className="gap-2">
-        <View className="flex-row justify-between items-start">
-          <View className="flex-1">
-            <Text className="text-lg font-bold text-foreground">{item.name}</Text>
-            <Text className="text-sm text-muted">{item.specialty}</Text>
+  const renderProfessionalCard = ({ item }: { item: ProfessionalRecord }) => {
+    const ratingLabel = typeof item.rating === "number" ? `${item.rating.toFixed(1)} avaliacao` : "Novo";
+
+    return (
+      <Card className="mb-4 gap-4">
+        <View className="flex-row items-start justify-between">
+          <View className="flex-1 pr-3">
+            <Text className="text-xl font-extrabold text-foreground">{item.name}</Text>
+            <Text className="mt-1 text-sm font-semibold text-primary">{item.specialty}</Text>
           </View>
-          <View className="bg-primary rounded-full px-3 py-1">
-            <Text className="text-white text-sm font-semibold">
-              ⭐ {typeof item.rating === "number" ? item.rating.toFixed(1) : "--"}
-            </Text>
-          </View>
+          <Badge label={ratingLabel} tone="primary" />
         </View>
 
-        <Text className="text-sm text-muted">{item.bio || "Profissional disponivel para atendimento."}</Text>
+        <Text className="text-sm leading-5 text-muted">{item.bio || "Profissional disponivel para atendimento."}</Text>
 
-        <View className="flex-row justify-between items-center mt-2">
-          <Text className="text-lg font-bold text-primary">R$ {(item.price / 100).toFixed(2)}</Text>
-          <Pressable
-            className="bg-primary rounded-lg px-4 py-2"
+        <View className="flex-row items-center justify-between rounded-2xl bg-background p-3">
+          <View>
+            <Text className="text-xs font-semibold uppercase tracking-widest text-muted">Consulta</Text>
+            <Text className="text-xl font-extrabold text-primary">R$ {(item.price / 100).toFixed(2)}</Text>
+          </View>
+          <Button
+            title="Agendar"
+            className="min-h-0 rounded-xl px-5 py-3"
+            textClassName="text-sm"
             onPress={() =>
               router.push({
                 pathname: "/(tabs)/patient/booking",
                 params: { professionalId: item.id },
               })
             }
-          >
-            <Text className="text-white font-semibold">Agendar</Text>
-          </Pressable>
+          />
         </View>
-      </View>
-    </Pressable>
-  );
+      </Card>
+    );
+  };
 
   return (
     <ScreenContainer className="bg-background">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="flex-1">
         <View className="gap-6 px-4 py-6">
-          <View className="gap-2">
-            <Text className="text-3xl font-bold text-foreground">Encontre um Profissional</Text>
-            <Text className="text-base text-muted">Busque por especialidade ou nome</Text>
-          </View>
-
-          <TextInput
-            placeholder="Buscar profissional ou especialidade..."
-            placeholderTextColor={colors.muted}
-            value={searchText}
-            onChangeText={setSearchText}
-            className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+          <ScreenHeader
+            eyebrow="MedFlow"
+            title="Encontre um profissional"
+            subtitle="Busque por especialidade ou nome e agende com poucos toques."
           />
 
-          <View className="flex-row justify-between items-center">
-            <Text className="text-sm text-muted">
+          <TextField
+            label="Buscar"
+            placeholder="Buscar profissional ou especialidade..."
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+
+          <Card variant="accent" className="py-4">
+            <Text className="text-sm font-bold text-primary">
               {filteredProfessionals.length} profissional(is) encontrado(s)
             </Text>
-          </View>
+            <Text className="mt-1 text-sm text-muted">Mostrando profissionais cadastrados no Supabase.</Text>
+          </Card>
 
           {filteredProfessionals.length > 0 ? (
             <FlatList
@@ -103,10 +104,10 @@ export default function PatientHomeScreen() {
               scrollEnabled={false}
             />
           ) : (
-            <View className="items-center justify-center py-8 gap-2">
-              <Text className="text-lg font-semibold text-foreground">Nenhum profissional encontrado</Text>
-              <Text className="text-sm text-muted">Tente uma busca diferente</Text>
-            </View>
+            <EmptyState
+              title="Nenhum profissional encontrado"
+              subtitle="Tente buscar por outro nome, especialidade ou confira se o profissional ja completou o cadastro."
+            />
           )}
         </View>
       </ScrollView>

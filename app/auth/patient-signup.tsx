@@ -1,13 +1,12 @@
-import { ScrollView, Text, View, TextInput, Pressable, ActivityIndicator } from "react-native";
+import { ScrollView, Text, View, Pressable } from "react-native";
 import { Link, router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
-import { useColors } from "@/hooks/use-colors";
+import { Badge, Button, Card, ScreenHeader, TextField } from "@/components/ui/medflow";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
 import { useState } from "react";
 
 export default function PatientSignupScreen() {
-  const colors = useColors();
-  const { signup, isAuthenticated, loading: authLoading, userType } = useUnifiedAuth();
+  const { signup } = useUnifiedAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,7 +14,7 @@ export default function PatientSignupScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Redirecionamento é feito automaticamente por useUnifiedAuthRedirect
+  // Redirecionamento e feito automaticamente por useUnifiedAuthRedirect.
 
   const handleSignup = async () => {
     if (!name || !email || !password) {
@@ -24,7 +23,7 @@ export default function PatientSignupScreen() {
     }
 
     if (password !== confirmPassword) {
-      setError("As senhas não coincidem");
+      setError("As senhas nao coincidem");
       return;
     }
 
@@ -39,7 +38,6 @@ export default function PatientSignupScreen() {
       console.log("[PatientSignup] Starting signup for:", email);
       await signup(email, password, "patient", name);
       console.log("[PatientSignup] Signup successful, redirecting to login");
-      // Navigate to login after successful signup
       setTimeout(() => {
         router.replace("auth/login" as any);
       }, 500);
@@ -54,115 +52,70 @@ export default function PatientSignupScreen() {
   return (
     <ScreenContainer className="bg-background">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="flex-1">
-        <View className="flex-1 justify-between py-8 px-6">
-          {/* Header */}
-          <View className="gap-2 mb-6">
-            <Text className="text-3xl font-bold text-foreground">Criar Conta</Text>
-            <Text className="text-base text-muted">Como Paciente</Text>
-          </View>
-
-          {/* Error Message */}
-          {error ? (
-            <View
-              className="rounded-lg p-3 mb-4"
-              style={{ backgroundColor: colors.error + "20" }}
-            >
-              <Text className="text-sm font-semibold" style={{ color: colors.error }}>
-                {error}
-              </Text>
+        <View className="flex-1 justify-between gap-8 px-6 py-8">
+          <View className="gap-6">
+            <View className="gap-3">
+              <Badge label="Conta paciente" tone="success" />
+              <ScreenHeader
+                title="Criar conta"
+                subtitle="Agende consultas, acompanhe pagamentos e entre na consulta online pelo MedFlow."
+              />
             </View>
-          ) : null}
 
-          {/* Form */}
-          <View className="gap-4 flex-1">
-            {/* Name Input */}
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">Nome Completo</Text>
-              <TextInput
+            {error ? (
+              <Card className="border-error/30 bg-error/10">
+                <Text className="text-sm font-bold text-error">{error}</Text>
+              </Card>
+            ) : null}
+
+            <Card className="gap-4">
+              <TextField
+                label="Nome completo"
                 placeholder="Seu nome"
-                placeholderTextColor={colors.muted}
                 value={name}
                 onChangeText={setName}
                 editable={!loading}
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                style={{ color: colors.foreground }}
               />
-            </View>
 
-            {/* Email Input */}
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">Email</Text>
-              <TextInput
+              <TextField
+                label="Email"
                 placeholder="seu@email.com"
-                placeholderTextColor={colors.muted}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
+                autoCapitalize="none"
                 editable={!loading}
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                style={{ color: colors.foreground }}
               />
-            </View>
 
-            {/* Password Input */}
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">Senha</Text>
-              <TextInput
-                placeholder="••••••••"
-                placeholderTextColor={colors.muted}
+              <TextField
+                label="Senha"
+                placeholder="********"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
                 editable={!loading}
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                style={{ color: colors.foreground }}
+                helperText="Use pelo menos 6 caracteres."
               />
-            </View>
 
-            {/* Confirm Password Input */}
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">Confirmar Senha</Text>
-              <TextInput
-                placeholder="••••••••"
-                placeholderTextColor={colors.muted}
+              <TextField
+                label="Confirmar senha"
+                placeholder="********"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
                 editable={!loading}
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                style={{ color: colors.foreground }}
               />
-            </View>
+            </Card>
           </View>
 
-          {/* Signup Button */}
           <View className="gap-3">
-            <Pressable
-              onPress={handleSignup}
-              disabled={loading}
-              style={({ pressed }) => [
-                {
-                  backgroundColor: colors.primary,
-                  opacity: pressed && !loading ? 0.9 : loading ? 0.6 : 1,
-                },
-              ]}
-              className="py-4 px-6 rounded-full items-center justify-center"
-            >
-              {loading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text className="text-base font-semibold text-white">Criar Conta</Text>
-              )}
-            </Pressable>
+            <Button title="Criar conta" onPress={handleSignup} loading={loading} />
 
-            {/* Login Link */}
             <View className="flex-row justify-center gap-1">
-              <Text className="text-sm text-muted">Já tem conta?</Text>
+              <Text className="text-sm text-muted">Ja tem conta?</Text>
               <Link href={"login" as any} asChild>
                 <Pressable>
-                  <Text className="text-sm font-semibold" style={{ color: colors.primary }}>
-                    Fazer login
-                  </Text>
+                  <Text className="text-sm font-bold text-primary">Fazer login</Text>
                 </Pressable>
               </Link>
             </View>

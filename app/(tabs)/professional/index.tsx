@@ -1,10 +1,11 @@
-import { ScrollView, Text, View, Pressable, FlatList, ActivityIndicator, Alert } from "react-native";
+import { ActivityIndicator, Alert, FlatList, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ScreenContainer } from "@/components/screen-container";
+import { Badge, Button, Card, EmptyState, ScreenHeader, StatCard } from "@/components/ui/medflow";
 import { useColors } from "@/hooks/use-colors";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
 import { openMeetingUrl } from "@/lib/meeting-links";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   buildAppointmentDateTime,
   confirmAppointmentWithMeetingUrl,
@@ -75,106 +76,83 @@ export default function ProfessionalHomeScreen() {
   const pendingCount = upcomingAppointments.filter((apt) => apt.status === "pending").length;
 
   const renderAppointmentCard = ({ item }: { item: AppointmentRecord }) => (
-    <Pressable
-      className="bg-surface rounded-2xl p-4 mb-3 border border-border"
-      style={({ pressed }) => [pressed && { opacity: 0.7 }]}
-    >
-      <View className="gap-3">
-        <View className="flex-row justify-between items-start">
-          <View className="flex-1">
-            <Text className="text-lg font-bold text-foreground">{item.patient_name || "Paciente"}</Text>
-          </View>
-          <View
-            className="rounded-full px-3 py-1"
-            style={{ backgroundColor: item.status === "confirmed" ? colors.success : colors.warning }}
-          >
-            <Text className="text-white text-xs font-semibold">
-              {item.status === "confirmed" ? "Confirmada" : "Pendente"}
-            </Text>
-          </View>
+    <Card className="mb-4 gap-4">
+      <View className="flex-row items-start justify-between">
+        <View className="flex-1 pr-3">
+          <Text className="text-xl font-extrabold text-foreground">{item.patient_name || "Paciente"}</Text>
+          <Text className="mt-1 text-sm text-muted">Proxima consulta</Text>
         </View>
-
-        <View className="flex-row gap-4 bg-background rounded-lg p-3">
-          <View className="flex-1">
-            <Text className="text-xs text-muted mb-1">Data</Text>
-            <Text className="text-sm font-semibold text-foreground">
-              {buildAppointmentDateTime(item.date, item.time).toLocaleDateString("pt-BR")}
-            </Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-xs text-muted mb-1">Horario</Text>
-            <Text className="text-sm font-semibold text-foreground">{item.time}</Text>
-          </View>
-        </View>
-
-        {item.status === "pending" && (
-          <View className="flex-row gap-2">
-            <Pressable
-              className="flex-1 bg-success rounded-lg py-2"
-              onPress={() => {
-                if (item.payment_status !== "paid") {
-                  Alert.alert(
-                    "Pagamento pendente",
-                    "A consulta so pode ser confirmada depois que o pagamento for aprovado.",
-                  );
-                  return;
-                }
-
-                updateStatusMutation.mutate({ appointmentId: item.id, status: "confirmed" });
-              }}
-              disabled={updateStatusMutation.isPending}
-            >
-              <Text className="text-white font-semibold text-center">
-                {updateStatusMutation.isPending ? "Salvando..." : "Confirmar Consulta"}
-              </Text>
-            </Pressable>
-            <Pressable
-              className="flex-1 bg-error rounded-lg py-2"
-              onPress={() => updateStatusMutation.mutate({ appointmentId: item.id, status: "cancelled" })}
-              disabled={updateStatusMutation.isPending}
-            >
-              <Text className="text-white font-semibold text-center">
-                {updateStatusMutation.isPending ? "Salvando..." : "Recusar"}
-              </Text>
-            </Pressable>
-          </View>
-        )}
-
-        {item.status === "confirmed" && (
-          <Pressable className="bg-primary rounded-lg py-2" onPress={() => handleStartAppointment(item)}>
-            <Text className="text-white font-semibold text-center">Iniciar Consulta</Text>
-          </Pressable>
-        )}
+        <Badge label={item.status === "confirmed" ? "Confirmada" : "Pendente"} tone={item.status === "confirmed" ? "success" : "warning"} />
       </View>
-    </Pressable>
+
+      <View className="flex-row gap-3 rounded-2xl bg-background p-4">
+        <View className="flex-1">
+          <Text className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted">Data</Text>
+          <Text className="text-sm font-bold text-foreground">
+            {buildAppointmentDateTime(item.date, item.time).toLocaleDateString("pt-BR")}
+          </Text>
+        </View>
+        <View className="flex-1">
+          <Text className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted">Horario</Text>
+          <Text className="text-sm font-bold text-foreground">{item.time}</Text>
+        </View>
+      </View>
+
+      {item.status === "pending" ? (
+        <View className="flex-row gap-3">
+          <Button
+            title={updateStatusMutation.isPending ? "Salvando..." : "Confirmar Consulta"}
+            variant="success"
+            className="flex-1 min-h-0 rounded-xl py-3"
+            textClassName="text-sm"
+            onPress={() => {
+              if (item.payment_status !== "paid") {
+                Alert.alert(
+                  "Pagamento pendente",
+                  "A consulta so pode ser confirmada depois que o pagamento for aprovado.",
+                );
+                return;
+              }
+
+              updateStatusMutation.mutate({ appointmentId: item.id, status: "confirmed" });
+            }}
+            disabled={updateStatusMutation.isPending}
+          />
+          <Button
+            title={updateStatusMutation.isPending ? "Salvando..." : "Recusar"}
+            variant="danger"
+            className="flex-1 min-h-0 rounded-xl py-3"
+            textClassName="text-sm"
+            onPress={() => updateStatusMutation.mutate({ appointmentId: item.id, status: "cancelled" })}
+            disabled={updateStatusMutation.isPending}
+          />
+        </View>
+      ) : null}
+
+      {item.status === "confirmed" ? (
+        <Button title="Iniciar Consulta" className="min-h-0 rounded-xl py-3" onPress={() => handleStartAppointment(item)} />
+      ) : null}
+    </Card>
   );
 
   return (
     <ScreenContainer className="bg-background">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="flex-1">
         <View className="gap-6 px-4 py-6">
-          <View className="gap-2">
-            <Text className="text-3xl font-bold text-foreground">Bem-vindo!</Text>
-            <Text className="text-base text-muted">Acompanhe suas proximas consultas</Text>
-          </View>
+          <ScreenHeader
+            eyebrow="Profissional"
+            title="Bem-vindo!"
+            subtitle="Acompanhe suas proximas consultas e mantenha a agenda em dia."
+          />
 
           <View className="flex-row gap-3">
-            <View className="flex-1 bg-surface rounded-2xl p-4 border border-border items-center gap-2">
-              <Text className="text-3xl font-bold text-primary">{confirmedCount}</Text>
-              <Text className="text-sm text-muted text-center">Confirmadas</Text>
-            </View>
-            <View className="flex-1 bg-surface rounded-2xl p-4 border border-border items-center gap-2">
-              <Text className="text-3xl font-bold text-warning">{pendingCount}</Text>
-              <Text className="text-sm text-muted text-center">Pendentes</Text>
-            </View>
-            <View className="flex-1 bg-surface rounded-2xl p-4 border border-border items-center gap-2">
-              <Text className="text-3xl font-bold text-success">{upcomingAppointments.length}</Text>
-              <Text className="text-sm text-muted text-center">Total</Text>
-            </View>
+            <StatCard value={confirmedCount} label="Confirmadas" tone="primary" />
+            <StatCard value={pendingCount} label="Pendentes" tone="warning" />
+            <StatCard value={upcomingAppointments.length} label="Total" tone="success" />
           </View>
 
           <View className="gap-3">
-            <Text className="text-lg font-bold text-foreground">Proximas Consultas</Text>
+            <Text className="text-xl font-extrabold text-foreground">Proximas consultas</Text>
 
             {upcomingAppointments.length > 0 ? (
               <FlatList
@@ -184,24 +162,18 @@ export default function ProfessionalHomeScreen() {
                 scrollEnabled={false}
               />
             ) : (
-              <View className="items-center justify-center py-8 gap-2 bg-surface rounded-2xl p-4 border border-border">
-                <Text className="text-lg font-semibold text-foreground">Nenhuma consulta proxima</Text>
-                <Text className="text-sm text-muted">Voce esta em dia com suas consultas</Text>
-              </View>
+              <EmptyState title="Nenhuma consulta proxima" subtitle="Voce esta em dia com suas consultas." />
             )}
           </View>
 
-          <View className="gap-2">
-            <Text className="text-lg font-bold text-foreground">Acoes Rapidas</Text>
-            <Pressable className="bg-primary rounded-lg py-3" onPress={() => router.push("/(tabs)/professional/schedule" as any)}>
-              <Text className="text-white font-semibold text-center">Gerenciar Horarios</Text>
-            </Pressable>
-            <Pressable
-              className="bg-surface border border-border rounded-lg py-3"
+          <View className="gap-3">
+            <Text className="text-xl font-extrabold text-foreground">Acoes rapidas</Text>
+            <Button title="Gerenciar Horarios" onPress={() => router.push("/(tabs)/professional/schedule" as any)} />
+            <Button
+              title="Ver Historico"
+              variant="secondary"
               onPress={() => router.push("/(tabs)/professional/appointments" as any)}
-            >
-              <Text className="text-primary font-semibold text-center">Ver Historico</Text>
-            </Pressable>
+            />
           </View>
         </View>
       </ScrollView>

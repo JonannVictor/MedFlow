@@ -37,6 +37,10 @@
 - [ ] Testar modo claro/escuro
 - [x] Criar base visual inicial com Button, Card, Input, Badge, Header, EmptyState e StatCard
 - [x] Aplicar primeira camada de estilo em Landing e Login
+- [x] Aplicar base visual nos cadastros de paciente e profissional
+- [x] Aplicar base visual na home do paciente e em Minhas Consultas
+- [x] Aplicar base visual na tela de agendamento do paciente
+- [x] Aplicar base visual na home e nas consultas do profissional
 
 ## Fase 6: Refinamentos
 - [ ] Validacoes de formularios

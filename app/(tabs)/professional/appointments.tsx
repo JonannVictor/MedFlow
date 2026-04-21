@@ -1,10 +1,11 @@
-import { ScrollView, Text, View, Pressable, FlatList, ActivityIndicator, Alert } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, Text, View } from "react-native";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ScreenContainer } from "@/components/screen-container";
+import { Badge, Button, Card, EmptyState, ScreenHeader } from "@/components/ui/medflow";
 import { useColors } from "@/hooks/use-colors";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
 import { openMeetingUrl } from "@/lib/meeting-links";
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   buildAppointmentDateTime,
   confirmAppointmentWithMeetingUrl,
@@ -13,6 +14,32 @@ import {
   type AppointmentRecord,
   updateAppointmentStatus,
 } from "@/lib/medflow-supabase";
+
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case "pending":
+      return "Pendente";
+    case "confirmed":
+      return "Confirmada";
+    case "cancelled":
+      return "Recusada";
+    default:
+      return "Desconhecido";
+  }
+};
+
+const getStatusTone = (status: string): "neutral" | "primary" | "success" | "warning" | "error" => {
+  switch (status) {
+    case "pending":
+      return "warning";
+    case "confirmed":
+      return "success";
+    case "cancelled":
+      return "error";
+    default:
+      return "neutral";
+  }
+};
 
 export default function ProfessionalAppointmentsScreen() {
   const colors = useColors();
@@ -92,126 +119,93 @@ export default function ProfessionalAppointmentsScreen() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return colors.warning;
-      case "confirmed":
-        return colors.success;
-      case "cancelled":
-        return colors.error;
-      default:
-        return colors.muted;
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "Pendente";
-      case "confirmed":
-        return "Confirmada";
-      case "cancelled":
-        return "Recusada";
-      default:
-        return "Desconhecido";
-    }
-  };
-
   const renderRequestCard = ({ item }: { item: AppointmentRecord }) => (
-    <Pressable
-      className="bg-surface rounded-2xl p-4 mb-3 border border-border"
-      style={({ pressed }) => [pressed && { opacity: 0.7 }]}
-    >
-      <View className="gap-3">
-        <View className="flex-row justify-between items-start">
-          <View className="flex-1">
-            <Text className="text-lg font-bold text-foreground">{item.patient_name || "Paciente"}</Text>
-          </View>
-          <View className="rounded-full px-3 py-1" style={{ backgroundColor: getStatusColor(item.status) }}>
-            <Text className="text-white text-xs font-semibold">{getStatusLabel(item.status)}</Text>
-          </View>
+    <Card className="mb-4 gap-4">
+      <View className="flex-row items-start justify-between">
+        <View className="flex-1 pr-3">
+          <Text className="text-xl font-extrabold text-foreground">{item.patient_name || "Paciente"}</Text>
+          <Text className="mt-1 text-sm text-muted">Solicitacao de consulta</Text>
         </View>
-
-        <View className="flex-row gap-4 bg-background rounded-lg p-3">
-          <View className="flex-1">
-            <Text className="text-xs text-muted mb-1">Data</Text>
-            <Text className="text-sm font-semibold text-foreground">
-              {buildAppointmentDateTime(item.date, item.time).toLocaleDateString("pt-BR")}
-            </Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-xs text-muted mb-1">Horario</Text>
-            <Text className="text-sm font-semibold text-foreground">{item.time}</Text>
-          </View>
-        </View>
-
-        {item.status === "pending" && (
-          <View className="flex-row gap-2">
-            <Pressable
-              className="flex-1 bg-success rounded-lg py-2"
-              onPress={() => handleConfirm(item.id)}
-              disabled={updateStatusMutation.isPending}
-            >
-              <Text className="text-white font-semibold text-center">
-                {updateStatusMutation.isPending ? "Salvando..." : "Confirmar Consulta"}
-              </Text>
-            </Pressable>
-            <Pressable
-              className="flex-1 bg-error rounded-lg py-2"
-              onPress={() => handleReject(item.id)}
-              disabled={updateStatusMutation.isPending}
-            >
-              <Text className="text-white font-semibold text-center">
-                {updateStatusMutation.isPending ? "Salvando..." : "Recusar"}
-              </Text>
-            </Pressable>
-          </View>
-        )}
-
-        {item.status === "confirmed" && (
-          <Pressable className="bg-primary rounded-lg py-2" onPress={() => handleStartAppointment(item)}>
-            <Text className="text-white font-semibold text-center">Iniciar Consulta</Text>
-          </Pressable>
-        )}
+        <Badge label={getStatusLabel(item.status)} tone={getStatusTone(item.status)} />
       </View>
-    </Pressable>
+
+      <View className="flex-row gap-3 rounded-2xl bg-background p-4">
+        <View className="flex-1">
+          <Text className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted">Data</Text>
+          <Text className="text-sm font-bold text-foreground">
+            {buildAppointmentDateTime(item.date, item.time).toLocaleDateString("pt-BR")}
+          </Text>
+        </View>
+        <View className="flex-1">
+          <Text className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted">Horario</Text>
+          <Text className="text-sm font-bold text-foreground">{item.time}</Text>
+        </View>
+      </View>
+
+      {item.status === "pending" ? (
+        <View className="flex-row gap-3">
+          <Button
+            title={updateStatusMutation.isPending ? "Salvando..." : "Confirmar Consulta"}
+            variant="success"
+            className="flex-1 min-h-0 rounded-xl py-3"
+            textClassName="text-sm"
+            onPress={() => handleConfirm(item.id)}
+            disabled={updateStatusMutation.isPending}
+          />
+          <Button
+            title={updateStatusMutation.isPending ? "Salvando..." : "Recusar"}
+            variant="danger"
+            className="flex-1 min-h-0 rounded-xl py-3"
+            textClassName="text-sm"
+            onPress={() => handleReject(item.id)}
+            disabled={updateStatusMutation.isPending}
+          />
+        </View>
+      ) : null}
+
+      {item.status === "confirmed" ? (
+        <Button title="Iniciar Consulta" className="min-h-0 rounded-xl py-3" onPress={() => handleStartAppointment(item)} />
+      ) : null}
+    </Card>
   );
+
+  const emptyTitle =
+    selectedTab === "pending"
+      ? "Nenhuma consulta pendente"
+      : selectedTab === "confirmed"
+        ? "Nenhuma consulta confirmada"
+        : "Nenhuma consulta recusada";
 
   return (
     <ScreenContainer className="bg-background">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="flex-1">
         <View className="gap-6 px-4 py-6">
-          <View className="gap-2">
-            <Text className="text-3xl font-bold text-foreground">Consultas Recebidas</Text>
-            <Text className="text-base text-muted">Gerencie suas solicitacoes de consulta</Text>
-          </View>
+          <ScreenHeader
+            eyebrow="Profissional"
+            title="Consultas recebidas"
+            subtitle="Gerencie solicitacoes, confirmacoes e historico de recusas."
+          />
 
           <View className="flex-row gap-2">
-            <Pressable
-              className={`flex-1 rounded-lg py-2 ${selectedTab === "pending" ? "bg-primary" : "bg-surface border border-border"}`}
-              onPress={() => setSelectedTab("pending")}
-            >
-              <Text className={`text-center font-semibold text-sm ${selectedTab === "pending" ? "text-white" : "text-foreground"}`}>
-                Pendentes
-              </Text>
-            </Pressable>
-            <Pressable
-              className={`flex-1 rounded-lg py-2 ${selectedTab === "confirmed" ? "bg-primary" : "bg-surface border border-border"}`}
-              onPress={() => setSelectedTab("confirmed")}
-            >
-              <Text className={`text-center font-semibold text-sm ${selectedTab === "confirmed" ? "text-white" : "text-foreground"}`}>
-                Confirmadas
-              </Text>
-            </Pressable>
-            <Pressable
-              className={`flex-1 rounded-lg py-2 ${selectedTab === "rejected" ? "bg-primary" : "bg-surface border border-border"}`}
-              onPress={() => setSelectedTab("rejected")}
-            >
-              <Text className={`text-center font-semibold text-sm ${selectedTab === "rejected" ? "text-white" : "text-foreground"}`}>
-                Recusadas
-              </Text>
-            </Pressable>
+            {[
+              ["pending", "Pendentes"],
+              ["confirmed", "Confirmadas"],
+              ["rejected", "Recusadas"],
+            ].map(([tab, label]) => {
+              const isSelected = selectedTab === tab;
+
+              return (
+                <Pressable
+                  key={tab}
+                  className={`flex-1 rounded-2xl py-4 ${isSelected ? "bg-primary" : "border border-border bg-surface"}`}
+                  onPress={() => setSelectedTab(tab as "pending" | "confirmed" | "rejected")}
+                >
+                  <Text className={`text-center text-sm font-bold ${isSelected ? "text-white" : "text-foreground"}`}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {filteredRequests.length > 0 ? (
@@ -222,18 +216,7 @@ export default function ProfessionalAppointmentsScreen() {
               scrollEnabled={false}
             />
           ) : (
-            <View className="items-center justify-center py-12 gap-2 bg-surface rounded-2xl p-4 border border-border">
-              <Text className="text-lg font-semibold text-foreground">
-                {selectedTab === "pending"
-                  ? "Nenhuma consulta pendente"
-                  : selectedTab === "confirmed"
-                    ? "Nenhuma consulta confirmada"
-                    : "Nenhuma consulta recusada"}
-              </Text>
-              <Text className="text-sm text-muted">
-                {selectedTab === "pending" ? "Voce esta em dia com suas solicitacoes" : "Nenhuma consulta nesta categoria"}
-              </Text>
-            </View>
+            <EmptyState title={emptyTitle} subtitle="Quando houver consultas nesta categoria, elas aparecerao aqui." />
           )}
         </View>
       </ScrollView>
