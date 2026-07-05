@@ -1,4 +1,26 @@
+-- ============================================================================
+-- MedFlow / Supabase Schema
+-- ============================================================================
+-- Este arquivo mantem a estrutura usada pelo app e tambem adiciona views
+-- auxiliares para facilitar a visualizacao no dashboard do Supabase.
+--
+-- Estrutura principal:
+-- 1. auth.users                 -> usuarios autenticados (Supabase Auth)
+-- 2. public.professionals       -> perfil profissional usado no app
+-- 3. public.availability        -> horarios disponiveis do profissional
+-- 4. public.appointments        -> consultas e status de pagamento
+--
+-- Views administrativas para leitura no dashboard:
+-- - public.patient_accounts
+-- - public.professional_accounts
+-- - public.appointments_overview
+-- ============================================================================
+
 create extension if not exists "pgcrypto";
+
+-- ============================================================================
+-- TABELAS PRINCIPAIS
+-- ============================================================================
 
 create table if not exists public.professionals (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -15,6 +37,10 @@ create table if not exists public.professionals (
 );
 
 alter table public.professionals add column if not exists meeting_url text;
+
+comment on table public.professionals is 'Perfil publico/comercial do profissional exibido no app.';
+comment on column public.professionals.id is 'Mesmo id do auth.users para o profissional.';
+comment on column public.professionals.price is 'Preco da consulta em centavos.';
 
 create table if not exists public.appointments (
   id uuid primary key default gen_random_uuid(),
@@ -42,6 +68,11 @@ alter table public.appointments add column if not exists payment_id text;
 alter table public.appointments add column if not exists payment_preference_id text;
 alter table public.appointments add column if not exists payment_checkout_url text;
 
+comment on table public.appointments is 'Consultas agendadas entre paciente e profissional.';
+comment on column public.appointments.patient_id is 'Usuario auth do paciente.';
+comment on column public.appointments.professional_id is 'Perfil profissional vinculado a consulta.';
+comment on column public.appointments.price is 'Valor da consulta em centavos.';
+
 create table if not exists public.availability (
   id uuid primary key default gen_random_uuid(),
   professional_id uuid not null references public.professionals(id) on delete cascade,
@@ -52,12 +83,24 @@ create table if not exists public.availability (
   updated_at timestamptz not null default now()
 );
 
+comment on table public.availability is 'Agenda semanal do profissional. Um registro representa um horario livre.';
+comment on column public.availability.day_of_week is '0=Seg, 1=Ter, 2=Qua, 3=Qui, 4=Sex, 5=Sab, 6=Dom se usado futuramente.';
+
+-- ============================================================================
+-- INDICES
+-- ============================================================================
+
 create index if not exists idx_appointments_patient_id on public.appointments(patient_id);
 create index if not exists idx_appointments_professional_id on public.appointments(professional_id);
 create index if not exists idx_appointments_status on public.appointments(status);
+create index if not exists idx_appointments_payment_status on public.appointments(payment_status);
 create index if not exists idx_appointments_date_time on public.appointments(date, time);
 create index if not exists idx_availability_professional_id on public.availability(professional_id);
 create index if not exists idx_availability_day_of_week on public.availability(day_of_week);
+
+-- ============================================================================
+-- TRIGGER DE SINCRONIZACAO DO PROFISSIONAL
+-- ============================================================================
 
 create or replace function public.sync_professional_from_auth_user()
 returns trigger
@@ -83,7 +126,7 @@ begin
     )
     values (
       new.id,
-      coalesce(new.raw_user_meta_data ->> 'name', new.email, 'Profissional'),
+      coalesce(nullif(new.raw_user_meta_data ->> 'name', ''), new.email, 'Profissional'),
       new.raw_user_meta_data ->> 'specialty',
       coalesce(new.raw_user_meta_data ->> 'bio', ''),
       coalesce(nullif(new.raw_user_meta_data ->> 'price', '')::integer, 0),
@@ -130,7 +173,7 @@ insert into public.professionals (
 )
 select
   u.id,
-  coalesce(u.raw_user_meta_data ->> 'name', u.email, 'Profissional'),
+  coalesce(nullif(u.raw_user_meta_data ->> 'name', ''), u.email, 'Profissional'),
   u.raw_user_meta_data ->> 'specialty',
   coalesce(u.raw_user_meta_data ->> 'bio', ''),
   coalesce(nullif(u.raw_user_meta_data ->> 'price', '')::integer, 0),
@@ -153,6 +196,86 @@ on conflict (id) do update
       crm = excluded.crm,
       meeting_url = excluded.meeting_url,
       updated_at = now();
+
+-- ============================================================================
+-- VIEWS AUXILIARES PARA O DASHBOARD DO SUPABASE
+-- ============================================================================
+-- Estas views servem para voce enxergar os dados com mais clareza.
+-- O app continua usando as tabelas principais.
+
+create or replace view public.patient_accounts as
+select
+  u.id,
+  coalesce(nullif(u.raw_user_meta_data ->> 'name', ''), u.email, 'Paciente') as name,
+  u.email,
+  u.phone,
+  u.created_at,
+  u.updated_at,
+  coalesce(u.raw_user_meta_data ->> 'userType', 'patient') as user_type
+from auth.users u
+where coalesce(u.raw_user_meta_data ->> 'userType', '') = 'patient';
+
+comment on view public.patient_accounts is 'View administrativa para localizar pacientes cadastrados no auth.users.';
+
+create or replace view public.professional_accounts as
+select
+  u.id,
+  coalesce(p.name, nullif(u.raw_user_meta_data ->> 'name', ''), u.email, 'Profissional') as name,
+  u.email,
+  u.phone,
+  p.specialty,
+  p.crm,
+  p.location,
+  p.price,
+  p.meeting_url,
+  p.rating,
+  p.created_at as professional_created_at,
+  p.updated_at as professional_updated_at,
+  u.created_at as auth_created_at
+from auth.users u
+join public.professionals p
+  on p.id = u.id
+where coalesce(u.raw_user_meta_data ->> 'userType', '') = 'professional';
+
+comment on view public.professional_accounts is 'View administrativa com dados de login + perfil do profissional.';
+
+create or replace view public.appointments_overview as
+select
+  a.id,
+  a.status,
+  a.payment_status,
+  a.date,
+  a.time,
+  a.price,
+  coalesce(a.patient_name, nullif(patient_user.raw_user_meta_data ->> 'name', ''), patient_user.email, 'Paciente') as patient_name,
+  patient_user.email as patient_email,
+  coalesce(a.professional_name, p.name, nullif(professional_user.raw_user_meta_data ->> 'name', ''), professional_user.email, 'Profissional') as professional_name,
+  professional_user.email as professional_email,
+  coalesce(a.specialty, p.specialty) as specialty,
+  a.payment_id,
+  a.payment_preference_id,
+  a.payment_checkout_url,
+  a.meeting_url,
+  a.created_at,
+  a.updated_at
+from public.appointments a
+left join auth.users patient_user
+  on patient_user.id = a.patient_id
+left join public.professionals p
+  on p.id = a.professional_id
+left join auth.users professional_user
+  on professional_user.id = a.professional_id;
+
+comment on view public.appointments_overview is 'View administrativa para leitura rapida de consultas, paciente, profissional e pagamento.';
+
+-- Nao expor views administrativas para clientes do app.
+revoke all on public.patient_accounts from anon, authenticated;
+revoke all on public.professional_accounts from anon, authenticated;
+revoke all on public.appointments_overview from anon, authenticated;
+
+-- ============================================================================
+-- ROW LEVEL SECURITY
+-- ============================================================================
 
 alter table public.professionals enable row level security;
 alter table public.appointments enable row level security;

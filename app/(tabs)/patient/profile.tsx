@@ -1,22 +1,49 @@
-import { ScrollView, Text, View, Pressable, TextInput, ActivityIndicator } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ScreenContainer } from "@/components/screen-container";
+import { Badge, Button, Card, ScreenHeader, StatCard, TextField } from "@/components/ui/medflow";
 import { useColors } from "@/hooks/use-colors";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
-import { useState } from "react";
+import { getPatientProfileFormData, savePatientProfile, type PatientProfileFormData } from "@/lib/medflow-supabase";
+
+const EMPTY_FORM: PatientProfileFormData = {
+  name: "",
+  email: "",
+  phone: "",
+  birthDate: "",
+  cpf: "",
+};
 
 export default function PatientProfileScreen() {
   const colors = useColors();
-  const { isAuthenticated, loading, logout } = useUnifiedAuth();
+  const { user, loading, logout } = useUnifiedAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "João Silva",
-    email: "joao@example.com",
-    phone: "(11) 98765-4321",
-    birthDate: "1990-05-15",
-    cpf: "123.456.789-00",
+  const [formData, setFormData] = useState<PatientProfileFormData>(EMPTY_FORM);
+  const { data: profileData, isLoading } = useQuery({
+    queryKey: user ? ["medflow", "patient-profile", user.id] : ["medflow", "patient-profile", "anonymous"],
+    queryFn: () => getPatientProfileFormData(user?.email ?? ""),
+    enabled: Boolean(user?.id),
   });
 
-  if (loading) {
+  useEffect(() => {
+    if (profileData) {
+      setFormData(profileData);
+    }
+  }, [profileData]);
+
+  const saveMutation = useMutation({
+    mutationFn: () => savePatientProfile(formData),
+    onSuccess: () => {
+      setIsEditing(false);
+      Alert.alert("Perfil atualizado", "Seus dados pessoais foram salvos com sucesso.");
+    },
+    onError: (error) => {
+      Alert.alert("Erro ao salvar", error.message);
+    },
+  });
+
+  if (loading || isLoading) {
     return (
       <ScreenContainer className="items-center justify-center">
         <ActivityIndicator size="large" color={colors.primary} />
@@ -24,142 +51,108 @@ export default function PatientProfileScreen() {
     );
   }
 
-  const handleSave = () => {
-    console.log("Perfil atualizado:", formData);
-    setIsEditing(false);
-  };
-
-  const handleLogout = async () => {
-    await logout();
-  };
+  const initials =
+    formData.name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "P";
 
   return (
     <ScreenContainer className="bg-background">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="flex-1">
         <View className="gap-6 px-4 py-6">
-          {/* Header */}
-          <View className="gap-2">
-            <Text className="text-3xl font-bold text-foreground">Meu Perfil</Text>
-            <Text className="text-base text-muted">Gerencie suas informações pessoais</Text>
-          </View>
+          <ScreenHeader
+            eyebrow="Paciente"
+            title="Meu perfil"
+            subtitle="Gerencie seus dados pessoais e mantenha suas informacoes sempre atualizadas."
+          />
 
-          {/* Profile Avatar */}
-          <View className="items-center gap-3">
-            <View
-              className="w-20 h-20 rounded-full items-center justify-center"
-              style={{ backgroundColor: colors.primary }}
-            >
-              <Text className="text-3xl font-bold text-white">JS</Text>
+          <Card className="items-center gap-3">
+            <View className="h-20 w-20 items-center justify-center rounded-full bg-primary">
+              <Text className="text-3xl font-extrabold text-white">{initials}</Text>
             </View>
-            <Text className="text-xl font-bold text-foreground">{formData.name}</Text>
-            <Text className="text-sm text-muted">Paciente</Text>
+            <Text className="text-xl font-extrabold text-foreground">{formData.name || "Paciente"}</Text>
+            <Badge label="Conta de paciente" tone="primary" />
+          </Card>
+
+          <View className="flex-row gap-3">
+            <StatCard value={formData.phone ? "OK" : "--"} label="Telefone" tone="primary" />
+            <StatCard value={formData.cpf ? "OK" : "--"} label="CPF" tone="success" />
+            <StatCard value={formData.birthDate ? "OK" : "--"} label="Nascimento" tone="warning" />
           </View>
 
-          {/* Edit Mode Toggle */}
-          <Pressable
-            className={`rounded-lg py-3 ${isEditing ? "bg-error" : "bg-primary"}`}
-            onPress={() => setIsEditing(!isEditing)}
-          >
-            <Text className="text-white font-semibold text-center">
-              {isEditing ? "Cancelar Edição" : "Editar Perfil"}
+          <Button
+            title={isEditing ? "Cancelar edicao" : "Editar perfil"}
+            variant={isEditing ? "danger" : "primary"}
+            onPress={() => {
+              if (isEditing && profileData) {
+                setFormData(profileData);
+              }
+              setIsEditing(!isEditing);
+            }}
+          />
+
+          <Card className="gap-4">
+            <TextField
+              label="Nome completo"
+              value={formData.name}
+              onChangeText={(text) => setFormData((prev) => ({ ...prev, name: text }))}
+              editable={isEditing}
+              inputClassName={!isEditing ? "opacity-60" : undefined}
+            />
+            <TextField
+              label="Email"
+              value={formData.email}
+              editable={false}
+              keyboardType="email-address"
+              inputClassName="opacity-60"
+            />
+            <TextField
+              label="Telefone"
+              value={formData.phone}
+              onChangeText={(text) => setFormData((prev) => ({ ...prev, phone: text }))}
+              editable={isEditing}
+              keyboardType="phone-pad"
+              inputClassName={!isEditing ? "opacity-60" : undefined}
+            />
+            <TextField
+              label="Data de nascimento"
+              value={formData.birthDate}
+              onChangeText={(text) => setFormData((prev) => ({ ...prev, birthDate: text }))}
+              editable={isEditing}
+              placeholder="YYYY-MM-DD"
+              inputClassName={!isEditing ? "opacity-60" : undefined}
+            />
+            <TextField
+              label="CPF"
+              value={formData.cpf}
+              onChangeText={(text) => setFormData((prev) => ({ ...prev, cpf: text }))}
+              editable={isEditing}
+              inputClassName={!isEditing ? "opacity-60" : undefined}
+            />
+          </Card>
+
+          {isEditing ? (
+            <Button
+              title="Salvar alteracoes"
+              variant="success"
+              onPress={() => saveMutation.mutate()}
+              loading={saveMutation.isPending}
+              disabled={saveMutation.isPending}
+            />
+          ) : null}
+
+          <Button title="Sair da conta" variant="danger" onPress={logout} />
+
+          <Card variant="accent" className="gap-2">
+            <Text className="text-sm font-bold text-foreground">Seguranca</Text>
+            <Text className="text-sm leading-5 text-muted">
+              Seus dados ficam vinculados a conta autenticada no Supabase. Sempre confira telefone, CPF e data de
+              nascimento antes de agendar.
             </Text>
-          </Pressable>
-
-          {/* Profile Form */}
-          <View className="gap-4 bg-surface rounded-2xl p-4 border border-border">
-            {/* Name */}
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">Nome Completo</Text>
-              <TextInput
-                value={formData.name}
-                onChangeText={(text) => setFormData({ ...formData, name: text })}
-                editable={isEditing}
-                className={`border rounded-lg px-3 py-2 text-foreground ${
-                  isEditing ? "border-primary bg-background" : "border-border bg-background opacity-60"
-                }`}
-                placeholderTextColor={colors.muted}
-              />
-            </View>
-
-            {/* Email */}
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">Email</Text>
-              <TextInput
-                value={formData.email}
-                onChangeText={(text) => setFormData({ ...formData, email: text })}
-                editable={isEditing}
-                keyboardType="email-address"
-                className={`border rounded-lg px-3 py-2 text-foreground ${
-                  isEditing ? "border-primary bg-background" : "border-border bg-background opacity-60"
-                }`}
-                placeholderTextColor={colors.muted}
-              />
-            </View>
-
-            {/* Phone */}
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">Telefone</Text>
-              <TextInput
-                value={formData.phone}
-                onChangeText={(text) => setFormData({ ...formData, phone: text })}
-                editable={isEditing}
-                keyboardType="phone-pad"
-                className={`border rounded-lg px-3 py-2 text-foreground ${
-                  isEditing ? "border-primary bg-background" : "border-border bg-background opacity-60"
-                }`}
-                placeholderTextColor={colors.muted}
-              />
-            </View>
-
-            {/* Birth Date */}
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">Data de Nascimento</Text>
-              <TextInput
-                value={formData.birthDate}
-                onChangeText={(text) => setFormData({ ...formData, birthDate: text })}
-                editable={isEditing}
-                placeholder="YYYY-MM-DD"
-                className={`border rounded-lg px-3 py-2 text-foreground ${
-                  isEditing ? "border-primary bg-background" : "border-border bg-background opacity-60"
-                }`}
-                placeholderTextColor={colors.muted}
-              />
-            </View>
-
-            {/* CPF */}
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">CPF</Text>
-              <TextInput
-                value={formData.cpf}
-                onChangeText={(text) => setFormData({ ...formData, cpf: text })}
-                editable={isEditing}
-                className={`border rounded-lg px-3 py-2 text-foreground ${
-                  isEditing ? "border-primary bg-background" : "border-border bg-background opacity-60"
-                }`}
-                placeholderTextColor={colors.muted}
-              />
-            </View>
-          </View>
-
-          {/* Save Button */}
-          {isEditing && (
-            <Pressable className="bg-success rounded-lg py-3" onPress={handleSave}>
-              <Text className="text-white font-semibold text-center">Salvar Alterações</Text>
-            </Pressable>
-          )}
-
-          {/* Logout Button */}
-          <Pressable className="bg-error rounded-lg py-3" onPress={handleLogout}>
-            <Text className="text-white font-semibold text-center">Sair da Conta</Text>
-          </Pressable>
-
-          {/* Info */}
-          <View className="bg-warning/10 rounded-lg p-4 gap-2">
-            <Text className="text-sm font-semibold text-foreground">Informações de Segurança</Text>
-            <Text className="text-xs text-muted">
-              Seus dados são criptografados e seguros. Nunca compartilhamos suas informações pessoais.
-            </Text>
-          </View>
+          </Card>
         </View>
       </ScrollView>
     </ScreenContainer>

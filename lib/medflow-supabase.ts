@@ -54,6 +54,14 @@ export type ProfessionalProfileFormData = {
   meetingUrl: string;
 };
 
+export type PatientProfileFormData = {
+  name: string;
+  email: string;
+  phone: string;
+  birthDate: string;
+  cpf: string;
+};
+
 export type AvailabilityRecord = {
   id: string;
   professional_id: string;
@@ -160,6 +168,10 @@ function normalizeMeetingUrl(value: unknown) {
   }
 
   return `https://${trimmed}`;
+}
+
+function readStringMetadata(metadata: Record<string, unknown>, key: string) {
+  return typeof metadata[key] === "string" ? metadata[key] : "";
 }
 
 export const medflowQueryKeys = {
@@ -337,6 +349,46 @@ export async function getProfessionalProfileFormData(userId: string, fallbackEma
           ? metadata.meeting_url
           : ""),
   } satisfies ProfessionalProfileFormData;
+}
+
+export async function getPatientProfileFormData(fallbackEmail = "") {
+  const { data: authData, error } = await supabase.auth.getUser();
+
+  if (error) {
+    throw new Error(toMessage(error, "Nao foi possivel carregar os dados do paciente."));
+  }
+
+  const authUser = authData.user;
+  const metadata = (authUser?.user_metadata ?? {}) as Record<string, unknown>;
+
+  return {
+    name: readStringMetadata(metadata, "name") || authUser?.email || "",
+    email: authUser?.email || fallbackEmail,
+    phone: readStringMetadata(metadata, "phone"),
+    birthDate: readStringMetadata(metadata, "birthDate"),
+    cpf: readStringMetadata(metadata, "cpf"),
+  } satisfies PatientProfileFormData;
+}
+
+export async function savePatientProfile(formData: PatientProfileFormData) {
+  if (!formData.name.trim()) {
+    throw new Error("Nome completo e obrigatorio.");
+  }
+
+  const { data, error } = await supabase.auth.updateUser({
+    data: {
+      name: formData.name.trim(),
+      phone: formData.phone.trim(),
+      birthDate: formData.birthDate.trim(),
+      cpf: formData.cpf.trim(),
+    },
+  });
+
+  if (error) {
+    throw new Error(toMessage(error, "Nao foi possivel salvar o perfil do paciente."));
+  }
+
+  return data.user;
 }
 
 export async function saveProfessionalProfile(

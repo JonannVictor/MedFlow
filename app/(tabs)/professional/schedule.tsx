@@ -1,9 +1,10 @@
-import { ScrollView, Text, View, Pressable, FlatList, ActivityIndicator, Alert } from "react-native";
-import { ScreenContainer } from "@/components/screen-container";
-import { useColors } from "@/hooks/use-colors";
-import { useUnifiedAuth } from "@/hooks/use-unified-auth";
+import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, Text, View } from "react-native";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ScreenContainer } from "@/components/screen-container";
+import { Button, Card, ScreenHeader } from "@/components/ui/medflow";
+import { useColors } from "@/hooks/use-colors";
+import { useUnifiedAuth } from "@/hooks/use-unified-auth";
 import {
   listProfessionalAvailability,
   medflowQueryKeys,
@@ -76,76 +77,64 @@ export default function ProfessionalScheduleScreen() {
   }
 
   const toggleTimeSlot = (slotId: string) => {
-    setSelectedTimes((prev) =>
-      prev.includes(slotId) ? prev.filter((id) => id !== slotId) : [...prev, slotId]
+    setSelectedTimes((prev) => (prev.includes(slotId) ? prev.filter((id) => id !== slotId) : [...prev, slotId]));
+  };
+
+  const renderTimeSlot = ({ item }: { item: TimeSlot }) => {
+    const isSelected = selectedTimes.includes(item.id);
+
+    return (
+      <Pressable
+        onPress={() => toggleTimeSlot(item.id)}
+        className={`m-1 flex-1 items-center justify-center rounded-2xl border-2 p-4 ${
+          isSelected ? "border-primary bg-primary" : item.available ? "border-border bg-surface" : "border-muted bg-muted/20 opacity-50"
+        }`}
+        disabled={!item.available}
+        style={({ pressed }) => [pressed ? { opacity: 0.82, transform: [{ scale: 0.98 }] } : null]}
+      >
+        <Text className={`font-bold ${isSelected ? "text-white" : item.available ? "text-foreground" : "text-muted"}`}>
+          {item.time}
+        </Text>
+      </Pressable>
     );
   };
-
-  const handleSaveSchedule = async () => {
-    await saveMutation.mutateAsync();
-  };
-
-  const renderTimeSlot = ({ item }: { item: TimeSlot }) => (
-    <Pressable
-      onPress={() => toggleTimeSlot(item.id)}
-      className={`flex-1 rounded-lg p-3 m-1 items-center justify-center border-2 ${
-        selectedTimes.includes(item.id)
-          ? "bg-primary border-primary"
-          : item.available
-            ? "bg-surface border-border"
-            : "bg-muted/20 border-muted opacity-50"
-      }`}
-      disabled={!item.available}
-    >
-      <Text
-        className={`font-semibold ${
-          selectedTimes.includes(item.id) ? "text-white" : item.available ? "text-foreground" : "text-muted"
-        }`}
-      >
-        {item.time}
-      </Text>
-    </Pressable>
-  );
 
   return (
     <ScreenContainer className="bg-background">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="flex-1">
         <View className="gap-6 px-4 py-6">
-          <View className="gap-2">
-            <Text className="text-3xl font-bold text-foreground">Minha Agenda</Text>
-            <Text className="text-base text-muted">Gerencie seus horarios disponiveis</Text>
-          </View>
+          <ScreenHeader
+            eyebrow="Profissional"
+            title="Minha agenda"
+            subtitle="Escolha seus horarios disponiveis. O paciente so ve o que estiver marcado aqui."
+          />
 
-          <View className="gap-2">
-            <Text className="text-sm font-semibold text-foreground">Selecione o dia</Text>
+          <Card className="gap-4">
+            <Text className="text-sm font-bold uppercase tracking-widest text-muted">Selecione o dia</Text>
             <View className="flex-row gap-2">
-              {DAYS_OF_WEEK.map((day, index) => (
-                <Pressable
-                  key={index}
-                  onPress={() => setSelectedDay(index)}
-                  className={`flex-1 rounded-lg py-2 ${
-                    selectedDay === index ? "bg-primary" : "bg-surface border border-border"
-                  }`}
-                >
-                  <Text
-                    className={`text-center font-semibold ${
-                      selectedDay === index ? "text-white" : "text-foreground"
-                    }`}
+              {DAYS_OF_WEEK.map((day, index) => {
+                const isSelected = selectedDay === index;
+
+                return (
+                  <Pressable
+                    key={day}
+                    onPress={() => setSelectedDay(index)}
+                    className={`flex-1 rounded-2xl py-3 ${isSelected ? "bg-primary" : "border border-border bg-surface"}`}
                   >
-                    {day}
-                  </Text>
-                </Pressable>
-              ))}
+                    <Text className={`text-center font-bold ${isSelected ? "text-white" : "text-foreground"}`}>{day}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
-          </View>
+          </Card>
 
-          <View className="bg-surface rounded-2xl p-4 border border-border gap-2">
-            <Text className="text-lg font-bold text-foreground">{DAYS_OF_WEEK[selectedDay]}</Text>
+          <Card variant="accent" className="gap-2">
+            <Text className="text-lg font-extrabold text-foreground">{DAYS_OF_WEEK[selectedDay]}</Text>
             <Text className="text-sm text-muted">{selectedTimes.length} horario(s) selecionado(s)</Text>
-          </View>
+          </Card>
 
-          <View className="gap-2">
-            <Text className="text-sm font-semibold text-foreground">Horarios Disponiveis</Text>
+          <Card className="gap-4">
+            <Text className="text-sm font-bold uppercase tracking-widest text-muted">Horarios disponiveis</Text>
             <FlatList
               data={TIME_SLOTS}
               renderItem={renderTimeSlot}
@@ -154,38 +143,37 @@ export default function ProfessionalScheduleScreen() {
               scrollEnabled={false}
               columnWrapperStyle={{ flexWrap: "wrap" }}
             />
-          </View>
+          </Card>
 
-          <View className="gap-2 bg-background rounded-lg p-3">
+          <Card className="gap-3">
             <View className="flex-row items-center gap-2">
-              <View className="w-4 h-4 rounded bg-primary" />
-              <Text className="text-xs text-foreground">Selecionado</Text>
+              <View className="h-4 w-4 rounded bg-primary" />
+              <Text className="text-sm text-foreground">Selecionado</Text>
             </View>
             <View className="flex-row items-center gap-2">
-              <View className="w-4 h-4 rounded bg-surface border border-border" />
-              <Text className="text-xs text-foreground">Disponivel</Text>
+              <View className="h-4 w-4 rounded border border-border bg-surface" />
+              <Text className="text-sm text-foreground">Disponivel</Text>
             </View>
             <View className="flex-row items-center gap-2">
-              <View className="w-4 h-4 rounded bg-muted/20" />
-              <Text className="text-xs text-muted">Indisponivel</Text>
+              <View className="h-4 w-4 rounded bg-muted/20" />
+              <Text className="text-sm text-muted">Indisponivel</Text>
             </View>
-          </View>
+          </Card>
 
-          <Pressable className="bg-primary rounded-lg py-3" onPress={handleSaveSchedule} disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text className="text-white font-semibold text-center">Salvar Horarios</Text>
-            )}
-          </Pressable>
+          <Button
+            title="Salvar horarios"
+            onPress={() => saveMutation.mutate()}
+            loading={saveMutation.isPending}
+            disabled={saveMutation.isPending}
+          />
 
-          <View className="bg-primary/10 rounded-lg p-4 gap-2">
-            <Text className="text-sm font-semibold text-foreground">Dica</Text>
-            <Text className="text-xs text-muted">
-              Voce pode atualizar seus horarios disponiveis a qualquer momento. Pacientes verao apenas os horarios que
-              voce marcou como disponiveis.
+          <Card variant="accent" className="gap-2">
+            <Text className="text-sm font-bold text-foreground">Dica</Text>
+            <Text className="text-sm leading-5 text-muted">
+              Atualize seus horarios a qualquer momento. Se um horario nao estiver selecionado, ele nao aparece para o
+              paciente no agendamento.
             </Text>
-          </View>
+          </Card>
         </View>
       </ScrollView>
     </ScreenContainer>

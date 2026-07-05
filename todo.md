@@ -41,12 +41,14 @@
 - [x] Aplicar base visual na home do paciente e em Minhas Consultas
 - [x] Aplicar base visual na tela de agendamento do paciente
 - [x] Aplicar base visual na home e nas consultas do profissional
+- [x] Aplicar base visual nos perfis e na agenda do profissional/paciente
 
 ## Fase 6: Refinamentos
 - [ ] Validacoes de formularios
 - [ ] Mensagens de erro/sucesso
 - [x] Loading states
 - [ ] Tratamento de edge cases
+- [x] Remover mock do perfil do paciente e usar dados reais do Auth
 
 ## Fase 7: Entrega
 - [ ] Criar checkpoint final
@@ -152,6 +154,8 @@
 - [x] Usar Expo `--tunnel` como caminho principal para testar o app no celular
 - [x] Aplicar `supabase/schema.sql` no projeto Supabase remoto
 - [x] Popular `public.professionals` com pelo menos um profissional real para validar o fluxo do paciente
+- [x] Reorganizar `supabase/schema.sql` com views administrativas para leitura clara de pacientes, profissionais e consultas
+- [x] Criar `supabase/ADMIN_GUIDE.md` com operacao basica do banco
 - [ ] Investigar instabilidade do `dev:server` ao subir fora do sandbox (`exit code 3221225786`)
 - [x] Subir o app localmente e validar o boot web
 - [ ] Definir a proxima frente principal de desenvolvimento apos a retomada
