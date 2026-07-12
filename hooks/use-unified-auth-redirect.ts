@@ -49,5 +49,5 @@ export function useUnifiedAuthRedirect() {
         router.replace(targetRoute as any);
       }
     }
-  }, [isAuthenticated, loading, segments, userType]);
+  }, [isAuthenticated, loading, segments, userType, router]);
 }

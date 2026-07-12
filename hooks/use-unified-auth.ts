@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
-import { Session, User as SupabaseUser } from "@supabase/supabase-js";
+import { Session } from "@supabase/supabase-js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Auth from "@/lib/_core/auth";
 import { syncProfessionalProfileFromAuth } from "@/lib/medflow-supabase";
 
 export type UserType = "patient" | "professional";

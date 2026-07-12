@@ -43,5 +43,5 @@ export function useRouteProtection() {
       router.replace("(tabs)/professional/index" as any);
       return;
     }
-  }, [userType, isAuthenticated, loading, segments]);
+  }, [userType, isAuthenticated, loading, segments, router]);
 }

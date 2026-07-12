@@ -29,7 +29,7 @@ const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
 // Don't set anchor here - let the router handle it naturally
 
 export default function RootLayout() {
-  const { isAuthenticated, userType } = useUnifiedAuth();
+  useUnifiedAuth();
   useUnifiedAuthRedirect();
   useRouteProtection();
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;

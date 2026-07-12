@@ -3,10 +3,7 @@ import { useEffect } from "react";
 import { ActivityIndicator, Alert, Text, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import {
-  medflowQueryKeys,
-  updateAppointmentPaymentMetadata,
-} from "@/lib/medflow-supabase";
+import { updateAppointmentPaymentMetadata } from "@/lib/medflow-supabase";
 import { verifyMercadoPagoPayment } from "@/lib/mercado-pago";
 import { useQueryClient } from "@tanstack/react-query";
 

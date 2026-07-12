@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Redirect } from "expo-router";
 import { useUnifiedAuth } from "@/hooks/use-unified-auth";
 import { ScreenContainer } from "@/components/screen-container";
