@@ -1,9 +1,14 @@
 # MedFlow — Product Vision
 
-> **Versão:** 1.0
->
-> **Status:** Documento Oficial
->
+| Campo | Valor |
+|-------|--------|
+| Documento | Product Vision |
+| Versão | 1.0 |
+| Status | Oficial |
+| Categoria | Vision |
+| Última atualização | 2026 |
+| Responsável | Equipe MedFlow |
+
 > Este documento define a visão do produto MedFlow. Todas as decisões de desenvolvimento, arquitetura, design e negócio devem estar alinhadas com os princípios descritos aqui.
 
 ---
