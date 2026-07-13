@@ -1848,6 +1848,298 @@ Todos os acessos administrativos deverão ser registrados em AuditLog.
 
 ---
 
-# Próximo
+---
 
-## Artificial Intelligence Domain
+# Artificial Intelligence Domain
+
+## AIConversation
+
+### SELECT
+
+Permitido apenas para usuários autorizados da mesma clínica.
+
+```sql
+ai_conversation.clinic_id = auth.clinic_id
+```
+
+Além disso.
+
+O acesso deverá respeitar.
+
+- proprietário da conversa;
+- permissões clínicas;
+- vínculo com o paciente quando existir.
+
+---
+
+### INSERT
+
+Executado por usuários autenticados autorizados.
+
+Ou automaticamente pelos serviços de IA.
+
+---
+
+### UPDATE
+
+Permitido apenas enquanto a conversa permanecer aberta.
+
+Após arquivamento.
+
+A conversa deverá tornar-se somente leitura.
+
+---
+
+### DELETE
+
+Não permitido.
+
+Conversas deverão utilizar Soft Delete.
+
+---
+
+## AIMessage
+
+### SELECT
+
+A mensagem herda automaticamente as permissões da AIConversation.
+
+Se o usuário não puder acessar a conversa.
+
+Também não poderá acessar suas mensagens.
+
+---
+
+### INSERT
+
+Executado automaticamente durante a conversa.
+
+---
+
+### UPDATE
+
+Não permitido.
+
+Mensagens representam histórico permanente.
+
+---
+
+### DELETE
+
+Não permitido.
+
+---
+
+## AIRecommendation
+
+### SELECT
+
+A recomendação herda automaticamente as permissões da AIConversation.
+
+Quando relacionada ao prontuário.
+
+Também deverá respeitar as permissões do MedicalRecord.
+
+---
+
+### INSERT
+
+Executado automaticamente pelo serviço de IA.
+
+---
+
+### UPDATE
+
+Não permitido.
+
+Caso seja necessária nova recomendação.
+
+Uma nova entidade deverá ser criada.
+
+---
+
+### DELETE
+
+Não permitido.
+
+---
+
+## AIPrompt
+
+### SELECT
+
+Somente.
+
+- Administradores da plataforma;
+- Administradores autorizados.
+
+Usuários comuns não deverão visualizar prompts internos.
+
+---
+
+### INSERT
+
+Somente administradores da plataforma.
+
+---
+
+### UPDATE
+
+Somente administradores autorizados.
+
+Novas alterações deverão gerar nova versão.
+
+---
+
+### DELETE
+
+Não permitido.
+
+Utilizar Soft Delete.
+
+---
+
+## AIUsage
+
+### SELECT
+
+Permitido apenas para.
+
+- Administradores;
+- Financeiro (quando houver cobrança por consumo);
+- Plataforma.
+
+```sql
+ai_usage.clinic_id = auth.clinic_id
+```
+
+---
+
+### INSERT
+
+Executado automaticamente pelos serviços de IA.
+
+---
+
+### UPDATE
+
+Não permitido.
+
+O consumo representa registro histórico.
+
+---
+
+### DELETE
+
+Não permitido.
+
+---
+
+# Política Geral do Domínio
+
+Todas as entidades deverão respeitar.
+
+```sql
+clinic_id = auth.clinic_id
+```
+
+Além disso.
+
+As permissões deverão ser herdadas da AIConversation quando aplicável.
+
+Entidades relacionadas ao prontuário deverão herdar também as permissões do MedicalRecord.
+
+---
+
+# Observações
+
+Nenhum usuário poderá.
+
+- visualizar conversas de outra clínica;
+- acessar recomendações clínicas sem autorização;
+- consultar prompts internos;
+- alterar histórico das conversas;
+- modificar registros de consumo da IA.
+
+Toda utilização da IA deverá gerar registros em AuditLog.
+
+---
+
+# Política Geral de RLS
+
+## Regras Obrigatórias
+
+Todas as entidades multi-tenant deverão possuir.
+
+```sql
+clinic_id
+```
+
+Sempre que possível.
+
+As políticas deverão utilizar.
+
+```sql
+clinic_id = current_clinic_id()
+```
+
+ou mecanismo equivalente ao sistema de autenticação utilizado.
+
+---
+
+## Defesa em Profundidade
+
+A autorização ocorrerá em múltiplas camadas.
+
+```text
+Frontend
+
+↓
+
+Backend
+
+↓
+
+RBAC
+
+↓
+
+Row Level Security
+
+↓
+
+Banco de Dados
+```
+
+Nenhuma camada deverá confiar exclusivamente na anterior.
+
+---
+
+## Auditoria
+
+Toda operação relevante deverá gerar registros em.
+
+```text
+AuditLog
+```
+
+Incluindo.
+
+- leitura de dados sensíveis;
+- alterações;
+- exclusões lógicas;
+- acessos administrativos;
+- acessos emergenciais;
+- utilização da IA.
+
+---
+
+## Status
+
+**Documento:** RLS.md
+
+**Versão:** 1.0
+
+**Status:** ✅ Concluído
+
+**Última atualização:** 2026
