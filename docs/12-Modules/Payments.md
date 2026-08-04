@@ -1,8 +1,8 @@
-# Módulo de Prescrições (Prescriptions)
+# Módulo de Pagamentos (Payments)
 
 | Campo | Valor |
 |-------|--------|
-| Documento | Prescriptions |
+| Documento | Payments |
 | Versão | 1.0 |
 | Status | Oficial |
 | Categoria | Modules |
@@ -13,27 +13,25 @@
 
 # 1. Visão Geral
 
-O módulo **Prescriptions** é responsável pelo gerenciamento das prescrições clínicas emitidas pelos profissionais de saúde.
+O módulo **Payments** é responsável pelo processamento, registro e acompanhamento dos pagamentos realizados dentro da plataforma MedFlow.
 
-Ele representa a intenção terapêutica registrada durante um atendimento.
-
-A execução da terapia pelo paciente não faz parte deste domínio.
+Ele representa a liquidação financeira de cobranças emitidas pelo módulo Finance.
 
 ---
 
 # 2. Princípio Fundamental
 
 ```text
-Prescription
+Invoice
 
 ≠
 
-Medication History
+Payment
 ```
 
-Uma prescrição representa uma ordem médica.
+Uma cobrança representa um valor devido.
 
-O histórico medicamentoso representa aquilo que efetivamente foi utilizado pelo paciente.
+Um pagamento representa a liquidação total ou parcial dessa cobrança.
 
 ---
 
@@ -42,41 +40,37 @@ O histórico medicamentoso representa aquilo que efetivamente foi utilizado pelo
 O módulo deverá responder:
 
 ```text
-Quem prescreveu?
+Quem realizou o pagamento?
 
-Para qual paciente?
+Qual cobrança foi paga?
 
-Durante qual atendimento?
+Quanto foi pago?
 
-Quais medicamentos?
+Quando ocorreu?
 
-Qual dosagem?
+Qual método foi utilizado?
 
-Qual duração?
-
-Quais instruções?
-
-Qual o status da prescrição?
+Qual o status da transação?
 ```
 
 ---
 
 # 4. Source of Truth
 
-Prescriptions será o Source of Truth para:
+Payments será o Source of Truth para:
 
 ```text
-Medical Prescriptions
+Payments
 
-Medication Orders
+Transactions
 
-Prescription Status
+Payment Status
 
-Prescription Items
+Refunds
 
-Renewals
+Chargebacks
 
-Prescription Audit
+Payment Audit
 ```
 
 ---
@@ -85,15 +79,14 @@ Prescription Audit
 
 O módulo será responsável por:
 
-- Prescrições
-- Itens prescritos
-- Posologia
-- Frequência
-- Duração
-- Renovação
-- Cancelamento
-- Assinatura
-- Auditoria
+- Pagamentos
+- Transações
+- Estornos
+- Reembolsos
+- Chargebacks
+- Conciliação
+- Webhooks financeiros
+- Auditoria financeira
 
 ---
 
@@ -101,69 +94,78 @@ O módulo será responsável por:
 
 Não pertence ao módulo:
 
-- Estoque
-- Farmácia
-- Dispensação
-- Administração do medicamento
-- Histórico medicamentoso
-- Diagnósticos
+- Emissão de cobranças
+- Precificação
+- Contabilidade
+- Fluxo de caixa
+- Contratos
+- Atendimento clínico
 
 ---
 
 # 7. Filosofia
 
-Prescriptions registra decisões terapêuticas.
+Payments registra movimentações financeiras.
 
-A administração do tratamento pertence a outros domínios.
+Finance define o que deve ser pago.
 
 ---
 
 # 8. Bounded Context
 
 ```text
-Medical Records
+Finance
 
 ↓
 
-Encounter
+Invoice
 
 ↓
 
-Prescriptions
+Payments
 
 ↓
 
-Medication
+Transaction
 
 ↓
 
-Notifications
+Accounting
 ```
 
 ---
 
 # 9. Domain Boundary
 
-Medical Records poderá referenciar prescrições.
+Payments nunca deverá definir:
 
-Mas nunca armazenará sua lógica.
+```text
+Preço
+
+Descontos comerciais
+
+Tabela de serviços
+
+Tributação
+```
+
+Essas responsabilidades pertencem ao módulo Finance.
 
 ---
 
 # 10. Aggregate Root
 
 ```text
-Prescription
+Payment
 
 ├── id
 ├── organizationId
-├── patientId
-├── encounterId
-├── professionalId
+├── invoiceId
+├── payerId
+├── amount
+├── currency
 ├── status
-├── issuedAt
-├── expiresAt
-├── signedAt
+├── createdAt
 └── metadata
 ```
 
@@ -171,7 +173,7 @@ Prescription
 
 # 11. Identity
 
-Toda Prescription possuirá:
+Todo Payment possuirá:
 
 ```text
 id
@@ -183,282 +185,266 @@ imutável.
 
 # 12. Ownership
 
-Toda prescrição pertence a:
+Todo Payment pertence a:
 
 ```text
 Organization
 
 +
 
-Patient
-
-+
-
-Encounter
+Invoice
 ```
 
 ---
 
-# 13. Professional
-
-Toda prescrição deverá registrar seu autor.
-
----
-
-# 14. Signature
-
-Uma prescrição poderá exigir assinatura clínica.
-
----
-
-# 15. Status
+# 13. Status
 
 Estados possíveis:
 
 ```text
-draft
+pending
 
-signed
+processing
+
+authorized
+
+paid
+
+failed
 
 cancelled
 
-expired
+refunded
 
-renewed
+chargeback
 ```
 
 ---
 
-# 16. Draft
+# 14. Pending
 
-Enquanto estiver em Draft, a prescrição poderá sofrer alterações.
-
----
-
-# 17. Signed
-
-Após assinatura:
-
-- preservar histórico;
-- evitar alterações silenciosas;
-- registrar auditoria.
+Pagamento criado, aguardando processamento.
 
 ---
 
-# 18. Cancellation
+# 15. Processing
 
-Cancelamentos nunca deverão remover a prescrição.
-
----
-
-# 19. Expiration
-
-Prescrições poderão possuir validade.
+Pagamento enviado ao gateway.
 
 ---
 
-# 20. Renewal
+# 16. Authorized
 
-Renovações deverão gerar novo registro.
-
-Nunca sobrescrever a prescrição original.
+Valor autorizado pelo adquirente.
 
 ---
 
-# 21. Prescription Items
+# 17. Paid
 
-Uma prescrição poderá conter diversos medicamentos.
+Pagamento confirmado.
 
 ---
 
-# 22. Prescription Item
+# 18. Failed
+
+Transação recusada ou não concluída.
+
+---
+
+# 19. Cancelled
+
+Pagamento cancelado antes da liquidação.
+
+---
+
+# 20. Refunded
+
+Pagamento devolvido total ou parcialmente.
+
+---
+
+# 21. Chargeback
+
+Pagamento contestado.
+
+---
+
+# 22. Transaction
+
+Cada Payment poderá gerar uma ou mais transações.
+
+---
+
+# 23. Transaction Entity
 
 ```text
-PrescriptionItem
+PaymentTransaction
 
 ├── id
-├── prescriptionId
-├── medication
-├── dosage
-├── route
-├── frequency
-├── duration
-├── quantity
-├── instructions
+├── paymentId
+├── gateway
+├── gatewayTransactionId
+├── status
+├── processedAt
 └── metadata
 ```
 
 ---
 
-# 23. Medication
-
-O domínio deverá permitir medicamentos padronizados ou cadastrados pela organização.
-
----
-
-# 24. Medication Reference
-
-O módulo poderá referenciar catálogo próprio ou externo.
-
----
-
-# 25. Route
+# 24. Payment Methods
 
 Exemplos:
 
 ```text
-Oral
+Pix
 
-IV
+Credit Card
 
-IM
+Debit Card
 
-Subcutaneous
+Cash
 
-Topical
+Bank Transfer
 
-Inhalation
+Insurance
 
-Ophthalmic
+Wallet
 ```
 
 ---
 
-# 26. Frequency
+# 25. Currency
+
+O domínio deverá suportar múltiplas moedas.
+
+---
+
+# 26. Amount
+
+Valores deverão utilizar precisão decimal apropriada.
+
+---
+
+# 27. Partial Payments
+
+Uma cobrança poderá receber diversos pagamentos parciais.
+
+---
+
+# 28. Installments
+
+O domínio deverá suportar parcelamentos.
+
+---
+
+# 29. Installment Entity
+
+```text
+Installment
+
+├── id
+├── paymentId
+├── number
+├── amount
+├── dueDate
+└── metadata
+```
+
+---
+
+# 30. Gateway
+
+O processamento poderá ocorrer através de provedores externos.
+
+---
+
+# 31. Gateway Providers
 
 Exemplos:
 
 ```text
-1x/day
+Stripe
 
-2x/day
+Mercado Pago
 
-Every 8 hours
+Pagar.me
 
-Weekly
+Stone
 
-Monthly
-
-As Needed
+Asaas
 ```
 
 ---
 
-# 27. Dosage
+# 32. Gateway Independence
 
-A dosagem deverá possuir estrutura.
-
-Não apenas texto.
+O domínio nunca dependerá diretamente de um gateway específico.
 
 ---
 
-# 28. Units
+# 33. Payment Intent
 
-Exemplos:
+Antes da cobrança poderá existir uma intenção de pagamento.
+
+---
+
+# 34. Authorization
+
+Autorizações poderão expirar.
+
+---
+
+# 35. Capture
+
+Cartões poderão utilizar captura posterior.
+
+---
+
+# 36. Refund
+
+Reembolsos poderão ser:
 
 ```text
-mg
+Full
 
-mL
-
-IU
-
-Drops
-
-Tablets
-
-Capsules
+Partial
 ```
 
 ---
 
-# 29. Duration
-
-A duração deverá ser registrada separadamente.
-
----
-
-# 30. Quantity
-
-Quantidade prescrita deverá ser explícita.
-
----
-
-# 31. Instructions
-
-Campo destinado às orientações do profissional.
-
----
-
-# 32. Free Text
-
-Texto livre continuará permitido.
-
----
-
-# 33. Structured Fields
-
-Sempre que possível, utilizar campos estruturados.
-
----
-
-# 34. Medication Catalog
-
-O catálogo de medicamentos permanecerá desacoplado do domínio.
-
----
-
-# 35. Controlled Medications
-
-O domínio deverá permitir requisitos adicionais para medicamentos controlados.
-
----
-
-# 36. Validation
-
-Antes da assinatura deverão ser verificadas:
+# 37. Refund Entity
 
 ```text
-Itens
+Refund
 
-Paciente
-
-Profissional
-
-Status
-
-Permissões
+├── id
+├── paymentId
+├── amount
+├── reason
+├── refundedAt
+└── metadata
 ```
 
 ---
 
-# 37. Clinical Context
+# 38. Chargeback
 
-Toda prescrição deverá estar relacionada a um contexto clínico.
+Chargebacks deverão preservar todo o histórico da transação.
 
 ---
 
-# 38. Encounter Relationship
-
-Fluxo:
+# 39. Chargeback Entity
 
 ```text
-Encounter
+Chargeback
 
-↓
-
-Prescription
-
-↓
-
-Prescription Items
+├── id
+├── paymentId
+├── reason
+├── status
+├── receivedAt
+└── metadata
 ```
-
----
-
-# 39. Versioning
-
-Mudanças relevantes deverão preservar histórico.
 
 ---
 
@@ -471,10 +457,10 @@ Toda alteração relevante deverá gerar auditoria.
 # 41. Audit Entity
 
 ```text
-PrescriptionAudit
+PaymentAudit
 
 ├── id
-├── prescriptionId
+├── paymentId
 ├── actorId
 ├── action
 ├── timestamp
@@ -485,137 +471,127 @@ PrescriptionAudit
 
 ---
 
-# 42. Audit Actions
+# 42. Domain Events
 
 Exemplos:
 
 ```text
-Created
+payment.created
 
-Updated
+payment.authorized
 
-Signed
+payment.paid
 
-Cancelled
+payment.failed
 
-Renewed
+payment.refunded
+
+payment.chargeback
 ```
 
 ---
 
-# 43. Timeline
-
-Medical Records poderá exibir prescrições na Timeline Clínica.
-
----
-
-# 44. Events
-
-O módulo poderá publicar:
+# 43. APIs Conceituais
 
 ```text
-prescription.created
+GET /payments
 
-prescription.signed
+GET /payments/{id}
 
-prescription.cancelled
+POST /payments
 
-prescription.renewed
+POST /payments/{id}/capture
+
+POST /payments/{id}/refund
+
+GET /transactions
 ```
 
 ---
 
-# 45. APIs Conceituais
-
-```text
-GET /prescriptions
-
-GET /prescriptions/{id}
-
-POST /prescriptions
-
-PUT /prescriptions/{id}
-
-POST /prescriptions/{id}/sign
-
-POST /prescriptions/{id}/cancel
-
-POST /prescriptions/{id}/renew
-```
-
----
-
-# 46. Commands
+# 44. Commands
 
 Preferir:
 
 ```text
-createPrescription()
+createPayment()
 
-signPrescription()
+authorizePayment()
 
-cancelPrescription()
+capturePayment()
 
-renewPrescription()
+refundPayment()
 
-addMedication()
+cancelPayment()
 ```
 
 ---
 
-# 47. Search
+# 45. Search
 
-Permitir busca por:
+Permitir pesquisa por:
 
 ```text
-Paciente
+Invoice
 
-Profissional
+Patient
 
-Medicamento
+Gateway
 
 Status
 
-Data
+Date
 
-Encounter
+Transaction ID
 ```
 
 ---
 
-# 48. Observability
+# 46. Observability
 
 Métricas:
 
 ```text
-Prescriptions Created
+Payments Created
 
-Signed
+Payments Paid
 
-Cancelled
+Refunds
 
-Renewed
+Failures
 
-Average Items
+Chargebacks
 ```
 
 ---
 
-# 49. Domain Invariants
+# 47. Domain Invariants
 
 ```text
-Every Prescription belongs to one Organization.
+Every Payment belongs to one Organization.
 
-Every Prescription belongs to one Patient.
+Every Payment belongs to one Invoice.
 
-Every Prescription belongs to one Encounter.
+Payments preserve financial history.
 
-Signed Prescriptions preserve history.
+Refunds never remove payments.
 
-Renewals create new Prescriptions.
+Chargebacks preserve transactions.
 
-Prescription Items belong to exactly one Prescription.
+Audit is mandatory.
 ```
+
+---
+
+# 48. ADR-1151
+
+Payments será o único Source of Truth das liquidações financeiras.
+
+---
+
+# 49. ADR-1152
+
+O domínio permanecerá desacoplado dos gateways de pagamento.
 
 ---
 
@@ -623,495 +599,430 @@ Prescription Items belong to exactly one Prescription.
 
 Na Parte 2 serão abordados:
 
-- Assinatura digital
-- Renovações
-- Medicamentos controlados
-- Interações medicamentosas
-- Validações
-- Auditoria avançada
-- APIs
-- Eventos
-- ADR-1031 em diante
+- Gateways
+- Webhooks
+- Pix
+- Cartões
+- Conciliação
+- Estornos
+- Segurança
+- ADR-1153 em diante
 ---
 
-# 51. Assinatura Clínica
+# 51. Gateways de Pagamento
 
-Uma prescrição somente deverá produzir efeitos oficiais após sua assinatura.
+O processamento financeiro poderá ocorrer através de gateways externos.
 
-Enquanto permanecer em estado **Draft**, ela representa apenas uma proposta terapêutica.
+O domínio deverá abstrair completamente o provedor utilizado.
 
 ---
 
-# 52. Signature Workflow
+# 52. Gateway Abstraction
 
 Fluxo conceitual:
 
 ```text
-Draft
+Payments
 
 ↓
 
-Validation
+Gateway Interface
 
 ↓
 
-Professional Signature
+Gateway Adapter
 
 ↓
 
-Signed
+Payment Provider
 ```
 
 ---
 
-# 53. Signature Entity
+# 53. Gateway Interface
 
-```text
-PrescriptionSignature
+O domínio dependerá apenas de interfaces.
 
-├── id
-├── prescriptionId
-├── professionalId
-├── signedAt
-├── signatureType
-├── metadata
-```
+Nunca de SDKs específicos.
 
 ---
 
-# 54. Signature Types
+# 54. Gateway Adapter
+
+Cada provedor deverá possuir um adaptador próprio.
 
 Exemplos:
 
 ```text
-Electronic
+Stripe Adapter
 
-Digital Certificate
+Mercado Pago Adapter
 
-Biometric (Future)
+Pagar.me Adapter
 
-Institutional
+Stone Adapter
+
+Asaas Adapter
 ```
 
 ---
 
-# 55. Signature Integrity
+# 55. Provider Independence
 
-Após assinatura:
-
-- preservar integridade;
-- impedir alterações silenciosas;
-- registrar auditoria completa.
+A troca de gateway nunca deverá exigir alterações no domínio Payments.
 
 ---
 
-# 56. Amendment
+# 56. Payment Flow
 
-Caso seja necessário corrigir uma prescrição assinada:
+Fluxo básico:
 
 ```text
-Original Prescription
+Invoice
 
 ↓
 
-Amendment
+Payment
 
 ↓
 
-New Version
-```
-
-Nunca alterar diretamente o documento original.
-
----
-
-# 57. Renewal
-
-Renovação representa uma nova decisão clínica.
-
----
-
-# 58. Renewal Relationship
-
-```text
-Prescription A
+Gateway
 
 ↓
 
-Renewed
+Authorization
 
 ↓
 
-Prescription B
-```
+Capture
 
-A relação entre ambas deverá permanecer registrada.
+↓
 
----
-
-# 59. Renewal Entity
-
-```text
-PrescriptionRenewal
-
-├── originalPrescriptionId
-├── renewedPrescriptionId
-├── renewedBy
-├── renewedAt
-└── reason
+Settlement
 ```
 
 ---
 
-# 60. Renewal Rules
+# 57. Authorization
 
-Uma renovação poderá:
-
-- manter medicamentos;
-- alterar dosagens;
-- adicionar novos itens;
-- remover itens.
-
-Sempre criando uma nova prescrição.
+Pagamentos poderão exigir autorização antes da captura.
 
 ---
 
-# 61. Cancellation
+# 58. Capture
 
-Cancelamentos deverão informar motivo.
+Após autorização, o valor poderá ser capturado integral ou parcialmente.
 
 ---
 
-# 62. Cancellation Entity
+# 59. Settlement
+
+A liquidação financeira representa a confirmação definitiva do pagamento.
+
+---
+
+# 60. Payment Lifecycle
+
+Estados possíveis:
 
 ```text
-PrescriptionCancellation
+Pending
 
-├── prescriptionId
-├── cancelledBy
-├── cancelledAt
-├── reason
-└── metadata
+Authorized
+
+Captured
+
+Settled
+
+Refunded
+
+Chargeback
 ```
 
 ---
 
-# 63. Cancellation History
+# 61. Webhooks
 
-O histórico deverá permanecer acessível.
-
----
-
-# 64. Controlled Medications
-
-Medicamentos controlados poderão exigir validações adicionais.
+O domínio deverá consumir webhooks enviados pelos gateways.
 
 ---
 
-# 65. Regulatory Compliance
-
-O domínio deverá permitir adaptação às regulamentações locais.
-
-A lógica regulatória não deverá ficar espalhada pelo código.
-
----
-
-# 66. Prescription Validation
-
-Antes da assinatura validar:
+# 62. Webhook Entity
 
 ```text
-Paciente
-
-Profissional
-
-Permissões
-
-Itens
-
-Status
-
-Validade
-```
-
----
-
-# 67. Clinical Validation
-
-Validações clínicas poderão evoluir ao longo do tempo.
-
----
-
-# 68. Medication Interaction
-
-O domínio deverá permitir integração com mecanismos de verificação de interação medicamentosa.
-
----
-
-# 69. Interaction Source
-
-As regras poderão ser provenientes de:
-
-```text
-Internal Database
-
-External API
-
-Clinical Knowledge Base
-```
-
----
-
-# 70. Interaction Result
-
-Exemplo:
-
-```text
-No Interaction
-
-Minor
-
-Moderate
-
-Severe
-
-Contraindicated
-```
-
----
-
-# 71. Decision Support
-
-Alertas representam apoio à decisão.
-
-Nunca impedem automaticamente a decisão clínica.
-
----
-
-# 72. Override
-
-O profissional poderá prosseguir quando permitido.
-
-Sempre registrando justificativa.
-
----
-
-# 73. Override Entity
-
-```text
-InteractionOverride
-
-├── prescriptionId
-├── interactionId
-├── professionalId
-├── reason
-├── createdAt
-└── metadata
-```
-
----
-
-# 74. Allergy Check
-
-O módulo poderá consultar alergias registradas no Medical Records.
-
-Nunca armazená-las localmente.
-
----
-
-# 75. Pregnancy Alerts
-
-Especialidades poderão adicionar verificações específicas.
-
----
-
-# 76. Pediatric Validation
-
-O domínio deverá permitir regras específicas para pacientes pediátricos.
-
----
-
-# 77. Renal Alerts
-
-Integrações futuras poderão sugerir ajustes terapêuticos conforme função renal.
-
----
-
-# 78. Hepatic Alerts
-
-A arquitetura deverá permitir verificações relacionadas à função hepática.
-
----
-
-# 79. Clinical Decision Support
-
-Prescriptions poderá integrar motores especializados de suporte à decisão clínica.
-
----
-
-# 80. Separation of Concerns
-
-O mecanismo de decisão clínica permanecerá desacoplado do Aggregate Prescription.
-
----
-
-# 81. Prescription Templates
-
-Profissionais poderão utilizar modelos reutilizáveis.
-
----
-
-# 82. Template Entity
-
-```text
-PrescriptionTemplate
+PaymentWebhook
 
 ├── id
-├── organizationId
-├── name
-├── specialty
-├── items
-├── createdBy
+├── gateway
+├── event
+├── payload
+├── receivedAt
 └── metadata
 ```
 
 ---
 
-# 83. Favorite Prescriptions
+# 63. Webhook Validation
 
-Profissionais poderão salvar prescrições favoritas.
+Todo webhook deverá validar:
 
----
+```text
+Signature
 
-# 84. Favorites
+Timestamp
 
-Esses modelos pertencem ao profissional.
+Origin
 
-Não representam prescrições emitidas.
-
----
-
-# 85. Template Versioning
-
-Mudanças deverão preservar histórico.
+Integrity
+```
 
 ---
 
-# 86. Template Sharing
+# 64. Idempotência
 
-Organizações poderão compartilhar templates entre profissionais.
-
----
-
-# 87. Bulk Prescription
-
-Uma prescrição poderá conter dezenas de medicamentos.
-
-A arquitetura deverá suportar esse cenário.
+Webhooks duplicados nunca deverão produzir efeitos duplicados.
 
 ---
 
-# 88. Maximum Limits
+# 65. Retry
 
-Limites deverão ser configuráveis.
-
-Nunca hardcoded.
+Eventos de webhook poderão ser reprocessados quando necessário.
 
 ---
 
-# 89. Printing
+# 66. Pix
 
-O domínio deverá permitir geração de versão para impressão.
+O domínio deverá suportar pagamentos via Pix.
 
 ---
 
-# 90. Export
+# 67. Pix Entity
 
-Exportações poderão utilizar:
+```text
+PixPayment
+
+├── paymentId
+├── qrCode
+├── copyPasteCode
+├── expiresAt
+└── metadata
+```
+
+---
+
+# 68. Pix Expiration
+
+Cobranças Pix poderão expirar automaticamente.
+
+---
+
+# 69. Pix Confirmation
+
+A confirmação ocorrerá através de webhook ou consulta ao gateway.
+
+---
+
+# 70. Cartão de Crédito
+
+O domínio deverá suportar pagamentos com cartão.
+
+---
+
+# 71. Card Authorization
+
+Autorizações poderão ocorrer antes da captura.
+
+---
+
+# 72. Card Capture
+
+A captura poderá ser imediata ou posterior.
+
+---
+
+# 73. Cartão de Débito
+
+Débito deverá seguir fluxo simplificado de liquidação.
+
+---
+
+# 74. Transferência Bancária
+
+Transferências poderão exigir conciliação manual ou automática.
+
+---
+
+# 75. Dinheiro
+
+Pagamentos em espécie poderão ser registrados manualmente.
+
+---
+
+# 76. Convênios
+
+O domínio deverá permitir liquidações provenientes de operadoras de saúde.
+
+---
+
+# 77. Wallets
+
+Carteiras digitais poderão ser integradas futuramente.
+
+---
+
+# 78. Multi-Currency
+
+O domínio deverá suportar múltiplas moedas.
+
+---
+
+# 79. Exchange Rate
+
+Conversões cambiais deverão preservar a taxa utilizada na transação.
+
+---
+
+# 80. Reconciliation
+
+O domínio deverá permitir processos de conciliação financeira.
+
+---
+
+# 81. Reconciliation Entity
+
+```text
+PaymentReconciliation
+
+├── id
+├── paymentId
+├── gatewayReference
+├── reconciledAt
+└── metadata
+```
+
+---
+
+# 82. Automatic Reconciliation
+
+Sempre que possível utilizar conciliação automática.
+
+---
+
+# 83. Manual Reconciliation
+
+Operadores autorizados poderão executar conciliações manuais.
+
+---
+
+# 84. Discrepancies
+
+Diferenças deverão permanecer registradas.
+
+---
+
+# 85. Settlement Report
+
+Gateways poderão fornecer relatórios de liquidação.
+
+---
+
+# 86. Importação
+
+Arquivos financeiros poderão ser importados para conciliação.
+
+---
+
+# 87. Exportação
+
+Relatórios poderão ser exportados em formatos padronizados.
+
+---
+
+# 88. Payment Receipts
+
+Todo pagamento poderá gerar um comprovante.
+
+---
+
+# 89. Receipt Entity
+
+```text
+PaymentReceipt
+
+├── id
+├── paymentId
+├── issuedAt
+├── format
+└── metadata
+```
+
+---
+
+# 90. Receipt Formats
+
+Exemplos:
 
 ```text
 PDF
 
-FHIR
+HTML
 
-HL7
+Email
 
-Other Standards
+JSON
 ```
 
 ---
 
-# 91. QR Code
+# 91. Cancellation
 
-No futuro, prescrições poderão possuir QR Code para verificação.
-
----
-
-# 92. External Verification
-
-A arquitetura deverá permitir validação externa da autenticidade da prescrição.
+Cancelamentos deverão preservar o histórico financeiro.
 
 ---
 
-# 93. Prescription Timeline
+# 92. Partial Refund
 
-Medical Records poderá exibir:
+Reembolsos parciais deverão atualizar o saldo restante.
+
+---
+
+# 93. Full Refund
+
+Reembolsos totais manterão a referência ao pagamento original.
+
+---
+
+# 94. Chargeback Workflow
+
+Fluxo:
 
 ```text
-Prescription Created
+Payment
 
 ↓
 
-Signed
+Chargeback Notification
 
 ↓
 
-Renewed
+Analysis
 
 ↓
 
-Cancelled
+Resolution
 ```
 
 ---
 
-# 94. Historical Integrity
+# 95. Fraud Detection
 
-Nenhuma prescrição assinada deverá desaparecer do histórico.
-
----
-
-# 95. APIs Avançadas
-
-```text
-POST /prescriptions/{id}/renew
-
-POST /prescriptions/{id}/cancel
-
-POST /prescriptions/{id}/print
-
-POST /prescriptions/{id}/export
-
-POST /prescriptions/templates
-
-GET  /prescription-templates
-```
+O domínio deverá permitir integração com motores antifraude.
 
 ---
 
-# 96. Domain Events
+# 96. Fraud Alerts
 
-Eventos adicionais:
-
-```text
-prescription.template.created
-
-prescription.printed
-
-prescription.exported
-
-prescription.override.created
-```
+Alertas nunca substituirão decisões humanas automaticamente.
 
 ---
 
@@ -1120,15 +1031,15 @@ prescription.override.created
 Métricas adicionais:
 
 ```text
-Interaction Alerts
+Gateway Errors
 
-Overrides
+Webhook Success
 
-Templates Used
+Refund Rate
 
-Renewals
+Authorization Rate
 
-Cancellation Rate
+Settlement Time
 ```
 
 ---
@@ -1136,80 +1047,68 @@ Cancellation Rate
 # 98. Domain Invariants
 
 ```text
-Every Signed Prescription preserves history.
+Every Payment references one Invoice.
 
-Renewals create new Prescriptions.
+Gateway integrations remain abstracted.
 
-Controlled Medications may require additional validation.
+Webhooks are idempotent.
 
-Templates never replace issued Prescriptions.
+Refunds preserve history.
 
-Clinical alerts support decisions without replacing professionals.
+Chargebacks never delete payments.
 
-Interaction overrides require justification.
+Settlement finalizes the payment lifecycle.
 ```
 
 ---
 
 # 99. Decisões Arquiteturais e de Produto
 
-## ADR-1031
+## ADR-1153
 
-Prescrições assinadas serão imutáveis.
-
----
-
-## ADR-1032
-
-Renovações criarão novas entidades.
+Gateways serão acessados exclusivamente através de adaptadores.
 
 ---
 
-## ADR-1033
+## ADR-1154
 
-Interações medicamentosas serão tratadas como apoio à decisão.
-
----
-
-## ADR-1034
-
-Overrides exigirão justificativa obrigatória.
+Webhooks deverão ser idempotentes.
 
 ---
 
-## ADR-1035
+## ADR-1155
 
-Templates permanecerão separados das prescrições emitidas.
-
----
-
-## ADR-1036
-
-O domínio suportará medicamentos controlados sem acoplamento às legislações específicas.
+Pix será tratado como método de pagamento nativo.
 
 ---
 
-## ADR-1037
+## ADR-1156
 
-A arquitetura permitirá integração com motores externos de decisão clínica.
-
----
-
-## ADR-1038
-
-Exportações utilizarão formatos padronizados quando possível.
+Reembolsos nunca modificarão pagamentos originais.
 
 ---
 
-## ADR-1039
+## ADR-1157
 
-Medical Records continuará sendo responsável pela Timeline Clínica.
+Conciliação poderá ocorrer automaticamente ou manualmente.
 
 ---
 
-## ADR-1040
+## ADR-1158
 
-Prescriptions permanecerá como Source of Truth para ordens terapêuticas.
+Chargebacks preservarão todo o histórico financeiro.
+
+---
+
+## ADR-1159
+
+Comprovantes poderão ser emitidos em múltiplos formatos.
+
+---
+
+## ADR-1160
+
+Payments permanecerá independente de qualquer provedor específico.
 
 ---
 
@@ -1217,23 +1116,21 @@ Prescriptions permanecerá como Source of Truth para ordens terapêuticas.
 
 Na Parte 3 serão abordados:
 
-- LGPD
 - Segurança
+- LGPD
 - Auditoria avançada
 - Multi-tenant
-- Multi-clinic
-- Compartilhamento
 - APIs públicas
 - Integrações
-- Escalabilidade
-- ADR-1041 em diante
+- Event Bus
+- ADR-1161 em diante
 ---
 
 # 101. Segurança
 
-O módulo Prescriptions manipula decisões terapêuticas oficiais.
+O módulo Payments manipula informações financeiras sensíveis.
 
-Seu conteúdo deverá ser protegido durante todo o ciclo de vida da prescrição.
+Toda implementação deverá priorizar confidencialidade, integridade e rastreabilidade.
 
 ---
 
@@ -1248,7 +1145,7 @@ Integridade
 
 Disponibilidade
 
-Rastreabilidade
+Auditabilidade
 
 Menor Privilégio
 
@@ -1262,37 +1159,47 @@ Need to Know
 Exemplos:
 
 ```text
-Medicamentos
+Valores financeiros
 
-Dosagens
+Status do pagamento
 
-Posologia
+Referências do gateway
 
-Instruções
+Comprovantes
 
-Profissional Responsável
-
-Assinatura Clínica
+Identificadores da transação
 ```
 
 ---
 
-# 104. LGPD
+# 104. PCI DSS
 
-O tratamento das prescrições deverá respeitar a LGPD e demais regulamentações aplicáveis.
+Sempre que houver integração com cartões, a arquitetura deverá permitir conformidade com PCI DSS.
+
+Dados sensíveis do cartão nunca deverão ser armazenados pelo domínio.
 
 ---
 
-# 105. Controle de Acesso
+# 105. Tokenização
 
-A autorização deverá considerar:
+Sempre que possível utilizar tokens fornecidos pelo gateway.
+
+Nunca armazenar PAN completo.
+
+---
+
+# 106. LGPD
+
+O tratamento de dados financeiros deverá respeitar a LGPD e demais regulamentações aplicáveis.
+
+---
+
+# 107. Controle de Acesso
+
+Toda operação deverá validar:
 
 ```text
 Organization
-
-↓
-
-Professional
 
 ↓
 
@@ -1300,42 +1207,44 @@ Role
 
 ↓
 
-Patient Relationship
+Permission
 
 ↓
 
-Permission
+Financial Scope
 ```
 
 ---
 
-# 106. Least Privilege
+# 108. Least Privilege
 
-Cada usuário visualizará apenas as informações necessárias para exercer sua função.
-
----
-
-# 107. Multi-Tenant
-
-Toda Prescription pertence a exatamente uma Organization.
+Usuários visualizarão apenas pagamentos compatíveis com suas permissões.
 
 ---
 
-# 108. Tenant Isolation
+# 109. Multi-Tenant
 
-Nenhuma consulta poderá acessar prescrições de outra organização.
+Todo Payment pertence exatamente a uma Organization.
 
 ---
 
-# 109. Multi-Clinic
+# 110. Tenant Isolation
+
+Nenhuma consulta poderá acessar pagamentos de outra organização.
+
+---
+
+# 111. Multi-Clinic
 
 Uma organização poderá possuir diversas clínicas.
 
-A clínica representa o contexto operacional da prescrição.
+Cada pagamento deverá manter referência ao contexto da clínica quando aplicável.
 
 ---
 
-# 110. Clinic Context
+# 112. Payment Scope
+
+Fluxo:
 
 ```text
 Organization
@@ -1346,56 +1255,22 @@ Clinic
 
 ↓
 
-Encounter
+Invoice
 
 ↓
 
-Prescription
+Payment
 ```
 
 ---
 
-# 111. Compartilhamento
+# 113. Auditoria
 
-O compartilhamento de prescrições deverá seguir políticas definidas pela organização.
-
----
-
-# 112. Exportação
-
-Exportações deverão ser autorizadas e auditadas.
+Toda alteração relevante deverá produzir auditoria.
 
 ---
 
-# 113. Export Formats
-
-Exemplos:
-
-```text
-PDF
-
-FHIR
-
-HL7
-
-Structured JSON
-```
-
----
-
-# 114. Impressão
-
-Impressões deverão ser registradas para fins de auditoria.
-
----
-
-# 115. Read Audit
-
-Quando exigido, visualizações também poderão gerar eventos de auditoria.
-
----
-
-# 116. Audit Trail
+# 114. Audit Trail
 
 Registrar:
 
@@ -1406,145 +1281,127 @@ Timestamp
 
 Action
 
-Prescription
+Payment
 
-Organization
+Before
+
+After
 
 Reason
-
-Source
 ```
 
 ---
 
-# 117. Audit Entity
-
-```text
-PrescriptionAuditEvent
-
-├── id
-├── organizationId
-├── prescriptionId
-├── actorId
-├── action
-├── occurredAt
-├── metadata
-```
-
----
-
-# 118. Audit Actions
+# 115. Audit Actions
 
 Exemplos:
 
 ```text
-Viewed
+Payment Created
 
-Created
+Authorized
 
-Updated
+Captured
 
-Signed
+Paid
 
-Printed
-
-Exported
+Refunded
 
 Cancelled
 
-Renewed
+Chargeback
 ```
 
 ---
 
-# 119. Imutabilidade
+# 116. Read Audit
 
-Após assinatura, a prescrição deverá permanecer imutável.
-
----
-
-# 120. Correções
-
-Correções deverão gerar:
-
-```text
-Amendment
-
-↓
-
-Audit
-
-↓
-
-New Version
-```
+Quando configurado pela organização, visualizações também poderão ser auditadas.
 
 ---
 
-# 121. Versionamento
+# 117. Exportação
 
-Toda alteração relevante deverá preservar versões anteriores.
-
----
-
-# 122. Provenance
-
-Toda informação deverá registrar:
-
-```text
-Who
-
-When
-
-Where
-
-Why
-```
+Exportações financeiras deverão respeitar permissões administrativas.
 
 ---
 
-# 123. APIs Públicas
+# 118. APIs Públicas
 
 Contratos deverão permanecer estáveis.
 
 ---
 
-# 124. API Versioning
+# 119. API Versioning
 
 Mudanças incompatíveis deverão gerar novas versões.
 
 ---
 
-# 125. External Integrations
+# 120. External Integrations
 
-O domínio poderá integrar:
+Payments poderá integrar:
 
 ```text
-Government Systems
+Payment Gateways
 
-Pharmacies
+Banks
 
-FHIR Servers
+Pix
 
-Clinical Decision Engines
+Accounting Systems
 
-Hospital Systems
+ERP
 ```
 
 ---
 
-# 126. Anti-Corruption Layer
+# 121. Provider Independence
 
-Integrações externas nunca deverão modificar diretamente o Aggregate Prescription.
+O domínio continuará independente do provedor financeiro utilizado.
 
 ---
 
-# 127. Event Bus
+# 122. Source of Truth
 
-Fluxo conceitual:
+Mesmo utilizando gateways externos:
 
 ```text
-Prescription
+Payments
+
+↓
+
+Source of Truth
+```
+
+para os registros internos da plataforma.
+
+---
+
+# 123. Provenance
+
+Toda integração deverá registrar:
+
+```text
+Gateway
+
+Reference
+
+ProcessedAt
+
+ReceivedAt
+
+CorrelationId
+```
+
+---
+
+# 124. Event Bus
+
+Fluxo:
+
+```text
+Payments
 
 ↓
 
@@ -1561,30 +1418,32 @@ Subscribers
 
 ---
 
-# 128. Published Events
+# 125. Published Events
 
 Exemplos:
 
 ```text
-prescription.created
+payment.created
 
-prescription.signed
+payment.authorized
 
-prescription.cancelled
+payment.paid
 
-prescription.renewed
+payment.failed
 
-prescription.exported
+payment.refunded
+
+payment.chargeback
 ```
 
 ---
 
-# 129. Event Consumers
+# 126. Event Consumers
 
 Exemplos:
 
 ```text
-Medical Records
+Finance
 
 Notifications
 
@@ -1592,108 +1451,114 @@ Analytics
 
 Audit
 
-AI
+Reporting
 ```
 
 ---
 
-# 130. Idempotência
+# 127. Idempotência
 
-Consumidores deverão suportar processamento duplicado.
-
----
-
-# 131. Retry
-
-Eventos poderão ser reenviados.
+Eventos e webhooks deverão suportar reprocessamento seguro.
 
 ---
 
-# 132. Dead Letter Queue
+# 128. Retry
 
-Eventos com falhas persistentes poderão ser encaminhados para análise.
-
----
-
-# 133. Performance
-
-Consultas frequentes deverão utilizar índices apropriados.
+Eventos poderão ser reenviados automaticamente quando necessário.
 
 ---
 
-# 134. Search
+# 129. Dead Letter Queue
+
+Eventos que excederem o limite de tentativas deverão ser enviados para análise.
+
+---
+
+# 130. Performance
+
+Consultas financeiras deverão responder rapidamente mesmo com grande volume de transações.
+
+---
+
+# 131. Search
 
 Permitir pesquisa por:
 
 ```text
+Invoice
+
 Patient
 
-Professional
-
-Medication
+Gateway
 
 Status
 
+Amount
+
 Date
 
-Encounter
-
-Clinic
+Transaction ID
 ```
 
 ---
 
-# 135. Search Projection
+# 132. Search Projection
 
-A pesquisa poderá utilizar projeções otimizadas.
-
----
-
-# 136. Pagination
-
-Grandes conjuntos deverão utilizar paginação.
+Pesquisas poderão utilizar índices especializados.
 
 ---
 
-# 137. Sorting
+# 133. Pagination
+
+Grandes consultas deverão utilizar paginação consistente.
+
+---
+
+# 134. Sorting
 
 Ordenações comuns:
 
 ```text
-IssuedAt
+CreatedAt
 
-SignedAt
+PaidAt
+
+Amount
 
 Status
 
-Professional
-
-Patient
+Gateway
 ```
 
 ---
 
-# 138. Escalabilidade
+# 135. Escalabilidade
 
-O módulo deverá suportar milhões de prescrições ao longo dos anos.
-
----
-
-# 139. Horizontal Scaling
-
-Workers e consultas poderão escalar horizontalmente.
+O módulo deverá suportar milhões de pagamentos ao longo dos anos.
 
 ---
 
-# 140. Cache
+# 136. Horizontal Scaling
 
-Cache poderá acelerar consultas sem comprometer consistência.
+Workers responsáveis por webhooks e conciliações poderão escalar horizontalmente.
 
 ---
 
-# 141. Observabilidade
+# 137. Cache
 
-O domínio deverá produzir:
+Cache poderá acelerar consultas sem comprometer a consistência financeira.
+
+---
+
+# 138. Cache Invalidation
+
+Alterações em pagamentos deverão invalidar automaticamente projeções afetadas.
+
+---
+
+# 139. Observabilidade
+
+O módulo deverá produzir:
 
 ```text
 Logs
@@ -1705,179 +1570,191 @@ Distributed Traces
 
 ---
 
-# 142. Logs
+# 140. Logs
 
-Logs nunca deverão expor conteúdo clínico desnecessário.
+Logs nunca deverão registrar informações financeiras sigilosas além do necessário.
 
 ---
 
-# 143. Métricas
+# 141. Métricas
 
 Exemplos:
 
 ```text
-Signed Prescriptions
+Payments Paid
 
-Renewals
+Failed Payments
 
-Interaction Alerts
+Refund Rate
 
-Exports
+Chargeback Rate
 
-Average Signing Time
+Gateway Latency
 ```
 
 ---
 
-# 144. Dashboards
+# 142. Dashboards
 
-Administradores poderão acompanhar indicadores operacionais.
+Administradores poderão acompanhar indicadores financeiros operacionais.
 
 ---
 
-# 145. Alertas
+# 143. Alertas
 
 Exemplos:
 
 ```text
-Falhas de Assinatura
+Alta taxa de falhas
 
-Grande volume de Cancelamentos
+Chargebacks elevados
 
-Falhas de Exportação
+Gateway indisponível
 
-Integrações indisponíveis
+Fila de webhooks acumulada
+
+Conciliação pendente
 ```
 
 ---
 
-# 146. Disaster Recovery
+# 144. Disaster Recovery
 
-O domínio deverá suportar recuperação após falhas críticas.
+O módulo deverá possuir plano de recuperação para falhas críticas.
 
 ---
 
-# 147. Backup
+# 145. Backup
 
 Backups deverão preservar:
 
 ```text
-Prescription
+Payments
 
-Items
+Transactions
 
-Signature
+Refunds
+
+Chargebacks
 
 Audit
 
-Relationships
+Reconciliation
 ```
 
 ---
 
-# 148. Restore
+# 146. Restore
 
 Processos de restauração deverão ser testados periodicamente.
 
 ---
 
-# 149. Disponibilidade
+# 147. Resiliência
 
-Prescriptions deverá permanecer disponível independentemente dos módulos consumidores.
-
----
-
-# 150. Resiliência
-
-Falhas em integrações externas nunca deverão impedir a criação local de prescrições.
+Falhas em gateways nunca deverão corromper o estado interno do pagamento.
 
 ---
 
-# 151. Domain Invariants
+# 148. Consistência
+
+Após qualquer falha deverão permanecer preservados:
 
 ```text
-Every Prescription belongs to one Organization.
+Payment
 
-Every Prescription belongs to one Patient.
+Transaction
 
-Signed Prescriptions are immutable.
+Audit
 
-Audit is mandatory.
+History
 
-Renewals create new entities.
-
-Tenant Isolation is mandatory.
-
-Clinical integrity is preserved.
-
-External integrations never bypass the domain.
+References
 ```
 
 ---
 
-# 152. Decisões Arquiteturais e de Produto
+# 149. Domain Invariants
 
-## ADR-1041
+```text
+Every Payment belongs to one Organization.
 
-Prescriptions adotará imutabilidade após assinatura.
+Tenant Isolation is mandatory.
 
----
+Audit is mandatory.
 
-## ADR-1042
+Refunds preserve history.
 
-Exportações serão obrigatoriamente auditadas.
+Gateways never bypass the domain.
 
----
-
-## ADR-1043
-
-Integrações utilizarão APIs estáveis e eventos versionados.
+Payments remain immutable after settlement.
+```
 
 ---
 
-## ADR-1044
+# 150. Decisões Arquiteturais e de Produto
+
+## ADR-1161
+
+Payments adotará isolamento completo entre organizações.
+
+---
+
+## ADR-1162
+
+Webhooks nunca alterarão diretamente o Aggregate sem validação.
+
+---
+
+## ADR-1163
 
 Toda alteração relevante produzirá auditoria.
 
 ---
 
-## ADR-1045
+## ADR-1164
 
-Tenant Isolation será obrigatório.
-
----
-
-## ADR-1046
-
-Eventos serão publicados através do Event Bus.
+Integrações utilizarão eventos versionados.
 
 ---
 
-## ADR-1047
+## ADR-1165
 
-O domínio permanecerá preparado para integração FHIR.
-
----
-
-## ADR-1048
-
-Assinaturas serão preservadas durante todo o ciclo de vida da prescrição.
+Payments permanecerá o Source of Truth das liquidações.
 
 ---
 
-## ADR-1049
+## ADR-1166
 
-Medical Records continuará sendo responsável pela Timeline Clínica.
-
----
-
-## ADR-1050
-
-Prescriptions permanecerá responsável exclusivamente pelas ordens terapêuticas.
+Conciliações poderão ocorrer de forma assíncrona.
 
 ---
 
-# 153. Continuação
+## ADR-1167
+
+Exportações financeiras serão auditáveis.
+
+---
+
+## ADR-1168
+
+Gateways permanecerão desacoplados através de adaptadores.
+
+---
+
+## ADR-1169
+
+Pagamentos liquidados preservarão histórico permanentemente.
+
+---
+
+## ADR-1170
+
+Payments permanecerá responsável exclusivamente pelas liquidações financeiras.
+
+---
+
+# 151. Continuação
 
 Na Parte 4 serão abordados:
 
@@ -1888,396 +1765,436 @@ Na Parte 4 serão abordados:
 - Checklists
 - Testabilidade
 - Failure Scenarios
-- Anti-Patterns
-- ADR-1051 até ADR-1060
+- ADR-1171 até ADR-1180
 ---
 
-# 154. Arquitetura do Domínio
+# 152. Arquitetura do Domínio
 
-O módulo Prescriptions deverá permanecer focado exclusivamente nas ordens terapêuticas.
+O módulo Payments deverá permanecer responsável exclusivamente pela liquidação financeira das cobranças.
 
-Nenhuma responsabilidade relacionada à administração do medicamento, estoque ou dispensação deverá ser incorporada ao domínio.
+Nenhuma regra relacionada à precificação ou faturamento deverá pertencer a este domínio.
 
 ---
 
-# 155. Aggregate Root
+# 153. Aggregate Root
 
-A entidade **Prescription** será o Aggregate Root.
+A entidade **Payment** será o Aggregate Root.
 
 Todas as alterações deverão ocorrer através dela ou de serviços de domínio apropriados.
 
 ---
 
-# 156. Aggregate Boundary
+# 154. Aggregate Boundary
 
-O Aggregate será responsável por garantir consistência entre:
+O Aggregate deverá garantir consistência entre:
 
 ```text
-Prescription
+Payment
 
-PrescriptionItem
+Transaction
 
-PrescriptionSignature
+Refund
 
-PrescriptionRenewal
+Chargeback
 
-PrescriptionCancellation
+Installment
+
+Receipt
 ```
 
 ---
 
-# 157. Entidades Externas
+# 155. Entidades Externas
 
 O Aggregate não controla diretamente:
 
 ```text
+Invoice
+
 Patient
 
-Professional
+Organization
 
-Encounter
+Accounting
 
-Medication Catalog
+Gateway
 
-Medical Record
+Bank
 ```
 
 Essas entidades serão apenas referenciadas.
 
 ---
 
-# 158. CQRS
+# 156. CQRS
 
-O domínio deverá permitir adoção futura de CQRS.
+O domínio deverá permanecer preparado para futura adoção de CQRS.
 
 ---
 
-# 159. Command Side
+# 157. Command Side
 
 Operações de escrita:
 
 ```text
-Create Prescription
+Create Payment
 
-Add Medication
+Authorize Payment
 
-Sign Prescription
+Capture Payment
 
-Renew Prescription
+Refund Payment
 
-Cancel Prescription
+Cancel Payment
 
-Export Prescription
+Register Chargeback
 ```
 
 ---
 
-# 160. Query Side
+# 158. Query Side
 
-Consultas poderão utilizar projeções independentes.
+Consultas poderão utilizar projeções especializadas.
 
 ---
 
-# 161. Read Models
+# 159. Read Models
 
 Exemplos:
 
 ```text
-Prescription Summary
+Payment Summary
 
-Professional View
+Gateway Dashboard
 
-Patient View
+Daily Settlement
 
-Pharmacy View
+Refund Dashboard
 
-History View
+Chargeback Dashboard
 ```
 
 ---
 
-# 162. Timeline Projection
+# 160. Financial Projection
 
-O Medical Records poderá consumir projeções específicas para compor a Timeline Clínica.
-
----
-
-# 163. Search Projection
-
-A pesquisa poderá utilizar índices especializados.
-
----
-
-# 164. Prescription Summary
-
-Uma projeção resumida poderá conter:
+Uma projeção poderá conter:
 
 ```text
-Professional
+Total Paid
 
-Patient
+Pending
 
-Date
+Refunded
 
-Status
+Chargebacks
 
-Medication Count
+Revenue
 ```
 
 ---
 
-# 165. Medication Summary
+# 161. Gateway Projection
 
-Outra projeção poderá listar:
+Outra projeção poderá apresentar:
 
 ```text
-Medication
+Gateway
 
-Dosage
+Transactions
 
-Frequency
+Failures
 
-Duration
+Average Latency
+
+Success Rate
 ```
-
-Sem carregar toda a prescrição.
 
 ---
 
-# 166. Event Sourcing (Future)
+# 162. Customer Payment View
+
+Uma visão resumida poderá conter:
+
+```text
+Invoices
+
+Payments
+
+Refunds
+
+Pending Balance
+```
+
+---
+
+# 163. Event Sourcing (Future)
 
 O domínio deverá permanecer compatível com futura adoção de Event Sourcing.
 
 ---
 
-# 167. Cache
+# 164. Cache
 
-Cache poderá acelerar operações de leitura.
+Cache poderá acelerar consultas.
 
 Jamais substituirá o Source of Truth.
 
 ---
 
-# 168. Cache Invalidation
+# 165. Cache Invalidation
 
-Mudanças relevantes deverão invalidar projeções afetadas.
-
----
-
-# 169. Search Optimization
-
-Consultas deverão permanecer eficientes mesmo com milhões de prescrições.
+Toda alteração financeira deverá invalidar automaticamente projeções relacionadas.
 
 ---
 
-# 170. KPIs
+# 166. Search Optimization
+
+Consultas deverão permanecer eficientes mesmo com milhões de pagamentos.
+
+---
+
+# 167. KPIs
 
 Indicadores possíveis:
 
 ```text
-Prescriptions Created
+Payments per Day
 
-Signed Prescriptions
+Revenue
 
-Renewals
+Average Ticket
 
-Cancellation Rate
+Refund Rate
 
-Average Medications per Prescription
+Chargeback Rate
 ```
 
 ---
 
-# 171. Clinical KPIs
+# 168. Operational KPIs
 
 Exemplos:
 
 ```text
-Most Prescribed Medications
+Gateway Latency
 
-Average Prescription Duration
+Webhook Processing Time
 
-Renewal Frequency
+Settlement Time
 
-Controlled Medication Usage
+Retry Rate
+
+Processing Errors
 ```
 
 ---
 
-# 172. Operational KPIs
+# 169. Business KPIs
 
 Exemplos:
 
 ```text
-Signing Time
+Revenue by Clinic
 
-Export Time
+Revenue by Professional
 
-Search Latency
+Payment Method Usage
 
-API Response Time
+Average Collection Time
 
-Integration Errors
+Conversion Rate
 ```
 
 ---
 
-# 173. Health Checks
+# 170. Health Checks
 
 O módulo deverá expor indicadores de saúde.
 
 ---
 
-# 174. Dependency Monitoring
+# 171. Dependency Monitoring
 
 Monitorar:
 
 ```text
-Medication Catalog
+Database
 
-Decision Support Engine
+Gateway
 
-FHIR Integration
+Webhook Queue
 
-Notification Queue
+Event Bus
+
+Bank APIs
 ```
 
 ---
 
-# 175. Failure Scenarios
+# 172. Failure Scenarios
 
 Exemplos:
 
 ```text
-Falha na assinatura
+Gateway Offline
 
-Medicamento inexistente
+Webhook Failure
 
-Falha de exportação
+Settlement Failure
 
-Integração indisponível
+Refund Failure
 
-Catálogo offline
+Duplicate Transaction
 
-Erro de validação
+Timeout
 ```
 
 ---
 
-# 176. Recovery
+# 173. Recovery
 
-Falhas deverão permitir recuperação sem perda da prescrição.
+Falhas deverão permitir recuperação sem perda da integridade financeira.
 
 ---
 
-# 177. Consistência
+# 174. Consistência
 
-Mesmo após falhas:
+Mesmo após falhas deverão permanecer preservados:
 
 ```text
-Prescription
+Payment
 
-↓
+Transactions
 
-History
-
-↓
+Refunds
 
 Audit
 
-↓
-
-Integrity
+History
 ```
 
-deverão permanecer preservados.
+---
+
+# 175. Duplicate Detection
+
+O domínio deverá identificar tentativas de processamento duplicado.
 
 ---
 
-# 178. Bulk Operations
+# 176. Financial Idempotency
 
-O domínio poderá suportar operações em lote quando apropriado.
+Operações críticas deverão utilizar chaves de idempotência.
 
 ---
 
-# 179. Batch Validation
+# 177. Reconciliation Status
 
-Operações em lote deverão validar cada prescrição individualmente.
+Estados possíveis:
+
+```text
+Pending
+
+Matched
+
+Unmatched
+
+Manual Review
+
+Completed
+```
+
+---
+
+# 178. Settlement Batches
+
+Liquidações poderão ser agrupadas em lotes.
+
+---
+
+# 179. Settlement Batch Entity
+
+```text
+SettlementBatch
+
+├── id
+├── gateway
+├── processedAt
+├── transactionCount
+├── totalAmount
+└── metadata
+```
 
 ---
 
 # 180. Checklists
 
-## Criar Prescrição
+## Criar Pagamento
 
 ```text
-[ ] Paciente válido
+[ ] Invoice válida
 
-[ ] Encounter válido
+[ ] Valor validado
 
-[ ] Profissional autorizado
-
-[ ] Itens adicionados
+[ ] Método informado
 
 [ ] Auditoria criada
 ```
 
 ---
 
-## Assinar Prescrição
+## Autorizar Pagamento
 
 ```text
-[ ] Todos os itens válidos
+[ ] Gateway disponível
 
-[ ] Permissão confirmada
+[ ] Valor confirmado
 
-[ ] Validações executadas
-
-[ ] Assinatura registrada
+[ ] Idempotência validada
 
 [ ] Evento publicado
 ```
 
 ---
 
-## Renovar Prescrição
+## Capturar Pagamento
 
 ```text
-[ ] Prescrição original localizada
+[ ] Autorização válida
 
-[ ] Nova entidade criada
+[ ] Captura executada
 
-[ ] Relação preservada
+[ ] Histórico atualizado
 
-[ ] Auditoria registrada
+[ ] Auditoria criada
 ```
 
 ---
 
-## Cancelar Prescrição
+## Reembolso
 
 ```text
-[ ] Justificativa informada
+[ ] Pagamento localizado
+
+[ ] Valor permitido
+
+[ ] Histórico preservado
+
+[ ] Evento publicado
+```
+
+---
+
+## Chargeback
+
+```text
+[ ] Notificação recebida
+
+[ ] Pagamento localizado
+
+[ ] Auditoria criada
 
 [ ] Status atualizado
-
-[ ] Auditoria criada
-
-[ ] Evento publicado
-```
-
----
-
-## Exportação
-
-```text
-[ ] Permissão validada
-
-[ ] Formato suportado
-
-[ ] Auditoria registrada
-
-[ ] Arquivo gerado
 ```
 
 ---
@@ -2285,21 +2202,21 @@ Operações em lote deverão validar cada prescrição individualmente.
 # 181. Checklist de Code Review
 
 ```text
-[ ] Sem alteração de prescrição assinada
+[ ] Aggregate preservado
 
-[ ] Tenant Isolation preservado
+[ ] Idempotência implementada
 
-[ ] Auditoria implementada
+[ ] Auditoria registrada
 
 [ ] Eventos publicados
 
-[ ] Integrações desacopladas
+[ ] APIs documentadas
 
 [ ] Testes atualizados
 
-[ ] Logs sem dados sensíveis
+[ ] Tenant Isolation preservado
 
-[ ] APIs documentadas
+[ ] Gateways desacoplados
 ```
 
 ---
@@ -2315,15 +2232,15 @@ O domínio deverá possuir alta cobertura de testes automatizados.
 Cobrir:
 
 ```text
-Prescription
+Payment
 
-PrescriptionItem
+Transaction
 
-Renewal
+Refund
 
-Cancellation
+Chargeback
 
-Signature
+Installments
 
 Validation
 ```
@@ -2337,22 +2254,22 @@ Validar:
 ```text
 Persistence
 
-API
+Gateway
 
-Events
+Webhook
 
 Audit
 
-Export
+Events
 
-Templates
+Reconciliation
 ```
 
 ---
 
 # 185. Testes de Concorrência
 
-Validar múltiplos profissionais tentando atualizar prescrições simultaneamente.
+Validar processamento simultâneo do mesmo pagamento.
 
 ---
 
@@ -2365,11 +2282,11 @@ Permissions
 
 Tenant Isolation
 
-Signature Integrity
+Gateway Validation
+
+Webhook Signature
 
 Audit
-
-Exports
 ```
 
 ---
@@ -2379,15 +2296,15 @@ Exports
 Avaliar:
 
 ```text
+Settlement
+
+Gateway Throughput
+
 Search
 
-Export
+Large Volumes
 
-Signing
-
-Large Prescriptions
-
-Bulk Operations
+Webhook Queue
 ```
 
 ---
@@ -2397,17 +2314,17 @@ Bulk Operations
 Evitar:
 
 ```text
-Alterar prescrições assinadas.
+Acoplar o domínio a um gateway específico.
 
-Misturar estoque com prescrição.
+Excluir pagamentos.
 
-Duplicar catálogo de medicamentos.
+Modificar pagamentos liquidados.
 
-Excluir prescrições.
+Ignorar idempotência.
 
-Misturar administração de medicamentos com ordens terapêuticas.
+Misturar faturamento com liquidação.
 
-Acoplar o domínio ao provedor de assinatura digital.
+Persistir dados completos de cartão.
 ```
 
 ---
@@ -2417,17 +2334,17 @@ Acoplar o domínio ao provedor de assinatura digital.
 Possíveis evoluções:
 
 ```text
-Electronic Prescription Networks
+Open Finance
 
-National Prescription Registry
+Instant Settlement
 
-FHIR MedicationRequest
+Recurring Payments
 
-Clinical Decision AI
+Subscription Billing
 
-Digital Certificate Integration
+Digital Wallets
 
-International Standards
+International Payments
 ```
 
 ---
@@ -2435,82 +2352,82 @@ International Standards
 # 190. Domain Invariants
 
 ```text
-Every Prescription has one Aggregate Root.
+Payments preserve history.
 
-Signed Prescriptions are immutable.
+Refunds never replace payments.
 
-Renewals preserve history.
+Chargebacks remain traceable.
 
-Cancellation preserves history.
+Gateways remain abstracted.
 
-Clinical validation precedes signature.
+Read Models never modify aggregates.
 
-External integrations never modify aggregates directly.
+Settlement finalizes payment lifecycle.
 
-Prescription history is permanent.
+Financial integrity is preserved.
 ```
 
 ---
 
 # 191. Decisões Arquiteturais e de Produto
 
-## ADR-1051
+## ADR-1171
 
-Prescription continuará sendo o Aggregate Root do domínio.
-
----
-
-## ADR-1052
-
-CQRS poderá ser adotado futuramente sem remodelar o domínio.
+Payment continuará sendo o Aggregate Root.
 
 ---
 
-## ADR-1053
+## ADR-1172
 
-Read Models especializados poderão coexistir com o Aggregate.
-
----
-
-## ADR-1054
-
-Toda assinatura produzirá evento de domínio.
+CQRS poderá ser adotado futuramente.
 
 ---
 
-## ADR-1055
+## ADR-1173
 
-Catálogo de medicamentos permanecerá desacoplado.
-
----
-
-## ADR-1056
-
-Assinaturas digitais serão abstraídas por interfaces.
+Read Models especializados serão permitidos.
 
 ---
 
-## ADR-1057
+## ADR-1174
 
-Toda exportação será auditável.
-
----
-
-## ADR-1058
-
-O domínio suportará integração futura com FHIR MedicationRequest.
+Toda liquidação produzirá eventos.
 
 ---
 
-## ADR-1059
+## ADR-1175
 
-Nenhuma prescrição assinada poderá ser modificada diretamente.
+Gateways permanecerão desacoplados.
 
 ---
 
-## ADR-1060
+## ADR-1176
 
-Prescriptions continuará sendo exclusivamente responsável pelas ordens terapêuticas.
+Chaves de idempotência serão obrigatórias para operações críticas.
+
+---
+
+## ADR-1177
+
+Toda exportação financeira será auditável.
+
+---
+
+## ADR-1178
+
+Conciliações permanecerão independentes do Aggregate.
+
+---
+
+## ADR-1179
+
+Pagamentos liquidados serão imutáveis.
+
+---
+
+## ADR-1180
+
+Payments permanecerá exclusivamente responsável pela liquidação financeira.
 
 ---
 
@@ -2519,33 +2436,37 @@ Prescriptions continuará sendo exclusivamente responsável pelas ordens terapê
 Na Parte 5 serão abordados:
 
 - Observabilidade avançada
-- LGPD detalhada
+- Arquitetura Hexagonal
+- Ports & Adapters
 - Disaster Recovery
 - Backup
 - Resiliência
-- Arquitetura distribuída
-- Anti-Corruption Layer
-- ADR-1061 até ADR-1070
+- APIs avançadas
+- ADR-1181 até ADR-1190
 ---
 
 # 193. Observabilidade
 
-O módulo Prescriptions deverá disponibilizar informações suficientes para monitoramento operacional e análise clínica, sem expor dados sensíveis desnecessários.
+O módulo Payments deverá fornecer informações suficientes para monitoramento operacional e financeiro da plataforma.
 
 ---
 
 # 194. Logs
 
-Os logs deverão registrar apenas informações técnicas relevantes.
+Os logs deverão registrar apenas informações técnicas necessárias.
 
-Nunca armazenar:
+Nunca registrar:
 
 ```text
-Prescrição completa
+Dados completos de cartão
 
-Dados pessoais completos
+CVV
 
-Conteúdo clínico desnecessário
+Credenciais do gateway
+
+Chaves privadas
+
+Dados bancários sensíveis
 ```
 
 ---
@@ -2563,26 +2484,48 @@ Level
 
 OrganizationId
 
-PrescriptionId
+PaymentId
 
-ProfessionalId
-
-Event
+Gateway
 
 CorrelationId
+
+Event
 ```
 
 ---
 
 # 196. Correlation ID
 
-Toda operação distribuída deverá possuir um Correlation ID para rastreamento ponta a ponta.
+Toda operação financeira distribuída deverá possuir um Correlation ID único.
 
 ---
 
 # 197. Distributed Tracing
 
-Integrações entre módulos deverão permitir rastreamento completo do fluxo da prescrição.
+Fluxo conceitual:
+
+```text
+Finance
+
+↓
+
+Payments
+
+↓
+
+Gateway
+
+↓
+
+Webhook
+
+↓
+
+Accounting
+```
+
+Todo o fluxo deverá ser rastreável.
 
 ---
 
@@ -2591,55 +2534,55 @@ Integrações entre módulos deverão permitir rastreamento completo do fluxo da
 Exemplos:
 
 ```text
-Prescriptions Created
+Payments Processed
 
-Signed Prescriptions
+Successful Payments
 
-Renewals
+Failed Payments
 
-Cancelled Prescriptions
+Refunds
 
-Average Signing Time
+Chargebacks
 
-Export Requests
+Webhook Processing Time
 ```
 
 ---
 
 # 199. Dashboards
 
-Administradores poderão visualizar:
+Administradores poderão acompanhar:
 
 ```text
-Prescrições emitidas
+Receita diária
 
-Renovações
+Receita mensal
 
-Cancelamentos
+Falhas por Gateway
 
-Exportações
+Chargebacks
 
-Alertas clínicos
+Reembolsos
 
-Falhas de integração
+Tempo médio de liquidação
 ```
 
 ---
 
-# 200. Alertas Operacionais
+# 200. Alertas
 
 Exemplos:
 
 ```text
-Taxa elevada de falhas
+Gateway indisponível
 
-Exportações incomuns
+Alta taxa de falhas
 
-Tempo elevado para assinatura
+Webhooks atrasados
 
-Integrações indisponíveis
+Chargebacks acima do limite
 
-Catálogo inacessível
+Fila de processamento acumulada
 ```
 
 ---
@@ -2650,39 +2593,39 @@ O módulo deverá expor indicadores de saúde.
 
 ---
 
-# 202. Dependencies
+# 202. Dependency Monitoring
 
 Monitorar:
 
 ```text
 Database
 
-Medication Catalog
+Payment Gateway
 
-Decision Support
+Webhook Queue
 
-Notification Queue
+Event Bus
 
-Signature Provider
+Bank APIs
 ```
 
 ---
 
 # 203. Resiliência
 
-Falhas externas nunca deverão impedir o registro da prescrição em modo local quando possível.
+Falhas externas nunca deverão comprometer a integridade financeira do domínio.
 
 ---
 
 # 204. Retry
 
-Integrações externas poderão utilizar política de retry controlada.
+Integrações poderão utilizar política controlada de Retry.
 
 ---
 
 # 205. Circuit Breaker
 
-Integrações repetidamente indisponíveis poderão utilizar Circuit Breaker.
+Falhas recorrentes em gateways poderão ativar Circuit Breaker automaticamente.
 
 ---
 
@@ -2709,70 +2652,74 @@ O módulo deverá possuir plano de recuperação para falhas críticas.
 Backups deverão preservar:
 
 ```text
-Prescription
+Payments
 
-Items
+Transactions
 
-Signature
+Refunds
+
+Chargebacks
 
 Audit
 
-Relationships
-
-Versions
+Settlement Batches
 ```
 
 ---
 
 # 210. Restore
 
-Processos de restauração deverão ser periodicamente testados.
+Processos de restauração deverão ser testados periodicamente.
 
 ---
 
 # 211. Data Integrity
 
-Após restauração, nenhuma prescrição deverá perder sua integridade referencial.
+Após restauração deverão permanecer preservados:
+
+```text
+Financial History
+
+Audit Trail
+
+Relationships
+
+Gateway References
+```
 
 ---
 
 # 212. Long-Term Storage
 
-Prescrições poderão permanecer armazenadas durante longos períodos conforme legislação aplicável.
+Registros financeiros poderão permanecer armazenados por longos períodos conforme exigências legais.
 
 ---
 
 # 213. Retention Policy
 
-As políticas de retenção deverão ser configuráveis.
+A política de retenção deverá ser configurável.
 
 ---
 
 # 214. Arquivamento
 
-Arquivamento não representa exclusão.
+Arquivamento nunca representa exclusão.
 
 ---
 
 # 215. Exclusão
 
-A exclusão física deverá ocorrer apenas quando permitida por exigências legais e políticas específicas.
+A exclusão física somente deverá ocorrer quando permitida por legislação aplicável.
 
 ---
 
-# 216. Anti-Corruption Layer
+# 216. Arquitetura Hexagonal
 
-Integrações externas nunca deverão conhecer detalhes internos do Aggregate.
-
----
-
-# 217. Adapters
-
-Toda integração deverá ocorrer através de adaptadores.
+O domínio deverá seguir os princípios de Ports & Adapters.
 
 ---
 
-# 218. Ports
+# 217. Ports
 
 O domínio dependerá apenas de interfaces.
 
@@ -2780,78 +2727,44 @@ Nunca de implementações concretas.
 
 ---
 
-# 219. Hexagonal Architecture
+# 218. Adapters
 
-Fluxo conceitual:
-
-```text
-Application
-
-↓
-
-Ports
-
-↓
-
-Domain
-
-↓
-
-Ports
-
-↓
-
-Infrastructure
-```
+Cada gateway deverá possuir seu próprio adaptador.
 
 ---
 
-# 220. Dependency Rule
+# 219. Dependency Rule
 
-O domínio nunca dependerá da infraestrutura.
+O domínio nunca dependerá diretamente da infraestrutura.
 
 ---
 
-# 221. External Providers
+# 220. External Providers
 
 Exemplos:
 
 ```text
-Digital Signature
+Stripe
 
-FHIR
+Mercado Pago
 
-Medication Catalog
+Stone
 
-Clinical Rules Engine
+Pagar.me
+
+Asaas
+
+Banco Central Pix
 ```
 
 ---
 
-# 222. Domain Services
-
-Regras complexas poderão ser encapsuladas em Domain Services.
-
----
-
-# 223. Application Services
-
-Coordenação de casos de uso deverá permanecer fora do Aggregate.
-
----
-
-# 224. Infrastructure
-
-Persistência, filas e integrações pertencem à camada de infraestrutura.
-
----
-
-# 225. Repository
+# 221. Repository
 
 Exemplo conceitual:
 
 ```text
-PrescriptionRepository
+PaymentRepository
 
 ↓
 
@@ -2859,162 +2772,182 @@ Find
 
 Save
 
-Update
-
 Search
+
+Update
 ```
 
 ---
 
-# 226. Specification Pattern
+# 222. Domain Services
 
-Consultas complexas poderão utilizar Specifications.
-
----
-
-# 227. Factory
-
-Factories poderão simplificar criação de prescrições complexas.
+Regras compartilhadas poderão ser encapsuladas em Domain Services.
 
 ---
 
-# 228. Value Objects
+# 223. Application Services
+
+Casos de uso deverão ser coordenados por Application Services.
+
+---
+
+# 224. Value Objects
 
 Exemplos:
 
 ```text
-Dosage
+Money
 
-Frequency
+Currency
 
-Duration
+PaymentMethod
 
-Route
+GatewayReference
 
-Quantity
+TransactionId
 ```
 
 ---
 
-# 229. Imutabilidade
+# 225. Imutabilidade
 
 Value Objects deverão ser imutáveis.
 
 ---
 
-# 230. Rich Domain Model
+# 226. Factory
 
-As regras deverão permanecer no domínio.
-
-Nunca espalhadas pela camada de infraestrutura.
+Factories poderão simplificar criação de pagamentos complexos.
 
 ---
 
-# 231. APIs Internas
+# 227. Specification Pattern
 
-APIs internas deverão preservar contratos estáveis.
+Consultas complexas poderão utilizar Specifications.
 
 ---
 
-# 232. APIs Externas
+# 228. APIs Internas
+
+APIs internas deverão permanecer estáveis.
+
+---
+
+# 229. APIs Públicas
 
 Integrações públicas deverão possuir versionamento.
 
 ---
 
-# 233. Versionamento
+# 230. Compatibilidade
+
+Sempre preservar backward compatibility quando possível.
+
+---
+
+# 231. Versionamento
 
 Mudanças incompatíveis deverão gerar nova versão.
 
 ---
 
-# 234. Compatibilidade
+# 232. Compliance
 
-Sempre preservar backward compatibility quando possível.
+O domínio deverá permanecer preparado para atender normas financeiras e regulatórias.
+
+---
+
+# 233. Auditoria Regulatória
+
+Auditorias deverão preservar rastreabilidade completa das operações financeiras.
+
+---
+
+# 234. Escalabilidade
+
+A arquitetura deverá suportar crescimento contínuo do volume de transações.
 
 ---
 
 # 235. Domain Invariants
 
 ```text
-Aggregate controls consistency.
-
-Value Objects are immutable.
-
 Repositories abstract persistence.
 
 Ports isolate infrastructure.
 
-Integrations never bypass the domain.
+Adapters integrate providers.
 
-Audit is preserved.
+Value Objects are immutable.
 
-History is immutable.
+Financial history is preserved.
 
-Clinical integrity is maintained.
+Audit is mandatory.
+
+Payments remain technology independent.
 ```
 
 ---
 
 # 236. Decisões Arquiteturais e de Produto
 
-## ADR-1061
+## ADR-1181
 
-Observabilidade será requisito arquitetural.
-
----
-
-## ADR-1062
-
-O domínio seguirá os princípios da Arquitetura Hexagonal.
+Observabilidade será requisito obrigatório.
 
 ---
 
-## ADR-1063
+## ADR-1182
 
-Integrações utilizarão Ports & Adapters.
-
----
-
-## ADR-1064
-
-Value Objects serão imutáveis.
+Payments seguirá Arquitetura Hexagonal.
 
 ---
 
-## ADR-1065
+## ADR-1183
 
-Factories poderão encapsular criação complexa.
+Gateways utilizarão Ports & Adapters.
 
 ---
 
-## ADR-1066
+## ADR-1184
+
+Value Objects permanecerão imutáveis.
+
+---
+
+## ADR-1185
+
+Factories poderão encapsular criação de pagamentos.
+
+---
+
+## ADR-1186
 
 Repositories abstrairão persistência.
 
 ---
 
-## ADR-1067
+## ADR-1187
 
 Application Services coordenarão casos de uso.
 
 ---
 
-## ADR-1068
+## ADR-1188
 
-Domain Services concentrarão regras compartilhadas.
+Domain Services centralizarão regras compartilhadas.
 
 ---
 
-## ADR-1069
+## ADR-1189
 
 Toda integração permanecerá desacoplada do domínio.
 
 ---
 
-## ADR-1070
+## ADR-1190
 
-Prescriptions permanecerá independente da tecnologia de persistência.
+Payments permanecerá independente da tecnologia de persistência.
 
 ---
 
@@ -3029,14 +2962,14 @@ Na Parte 6 serão abordados:
 - Checklists
 - Definition of Done
 - Failure Scenarios
-- ADR-1071 até ADR-1080
+- ADR-1191 até ADR-1200
 ---
 
 # 238. Arquitetura Orientada a Eventos
 
-O módulo Prescriptions deverá publicar eventos de domínio para informar mudanças relevantes aos demais módulos da plataforma.
+O módulo Payments deverá publicar eventos de domínio para informar alterações relevantes no ciclo de vida dos pagamentos.
 
-Esses eventos representam alterações no ciclo de vida da prescrição.
+Esses eventos representam movimentações financeiras concluídas ou em processamento.
 
 ---
 
@@ -3045,7 +2978,7 @@ Esses eventos representam alterações no ciclo de vida da prescrição.
 Fluxo conceitual:
 
 ```text
-Prescriptions
+Payments
 
 ↓
 
@@ -3067,19 +3000,21 @@ Subscribers
 Exemplos:
 
 ```text
-prescription.created
+payment.created
 
-prescription.updated
+payment.processing
 
-prescription.signed
+payment.authorized
 
-prescription.cancelled
+payment.captured
 
-prescription.renewed
+payment.paid
 
-prescription.exported
+payment.failed
 
-prescription.printed
+payment.refunded
+
+payment.chargeback
 ```
 
 ---
@@ -3089,30 +3024,30 @@ prescription.printed
 Exemplos:
 
 ```text
-Medical Records
+Finance
 
 Notifications
+
+Reports
 
 Analytics
 
 Audit
 
 AI
-
-Reporting
 ```
 
 ---
 
 # 242. Responsabilidade
 
-Prescriptions informa:
+Payments informa:
 
 ```text
-Uma decisão terapêutica ocorreu.
+Uma movimentação financeira ocorreu.
 ```
 
-Os consumidores decidem como reagir.
+Os módulos consumidores decidem como reagir ao evento.
 
 ---
 
@@ -3129,40 +3064,52 @@ OccurredAt
 
 OrganizationId
 
-PrescriptionId
+PaymentId
 ```
 
 ---
 
 # 244. Event Payload
 
-Payloads deverão conter apenas informações necessárias.
+Os eventos deverão conter apenas informações necessárias.
 
-Nunca transmitir toda a prescrição quando apenas o identificador for suficiente.
+Sempre que possível utilizar:
+
+```text
+PaymentId
+
+InvoiceId
+
+OrganizationId
+
+Status
+
+Amount
+```
 
 ---
 
 # 245. Idempotência
 
-Consumidores deverão suportar reprocessamento do mesmo evento.
+Consumidores deverão suportar processamento duplicado sem efeitos colaterais.
 
 ---
 
 # 246. Retry
 
-Eventos poderão ser reenviados automaticamente quando necessário.
+Eventos poderão ser reenviados automaticamente em caso de falhas temporárias.
 
 ---
 
 # 247. Dead Letter Queue
 
-Eventos não processados após múltiplas tentativas deverão ser encaminhados para análise.
+Eventos não processados após o limite de tentativas deverão ser enviados para análise.
 
 ---
 
 # 248. CQRS
 
-O domínio deverá permanecer preparado para adoção futura de CQRS.
+O domínio deverá permanecer preparado para futura adoção de CQRS.
 
 ---
 
@@ -3171,24 +3118,24 @@ O domínio deverá permanecer preparado para adoção futura de CQRS.
 Operações de escrita:
 
 ```text
-Create Prescription
+Create Payment
 
-Sign Prescription
+Authorize Payment
 
-Renew Prescription
+Capture Payment
 
-Cancel Prescription
+Refund Payment
 
-Add Item
+Register Chargeback
 
-Remove Item
+Cancel Payment
 ```
 
 ---
 
 # 250. Query Side
 
-Consultas poderão utilizar modelos especializados.
+Consultas poderão utilizar projeções especializadas.
 
 ---
 
@@ -3197,40 +3144,62 @@ Consultas poderão utilizar modelos especializados.
 Exemplos:
 
 ```text
-Prescription Summary
+Payment Dashboard
 
-Patient View
+Daily Revenue
 
-Professional View
+Refund Dashboard
 
-Medication View
+Gateway Monitoring
 
-History View
+Financial Timeline
 ```
 
 ---
 
-# 252. Dashboard Projection
+# 252. Revenue Projection
 
-Painéis administrativos poderão utilizar projeções independentes.
+Uma projeção poderá apresentar:
+
+```text
+Revenue Today
+
+Revenue Month
+
+Revenue Year
+
+Pending Revenue
+```
 
 ---
 
-# 253. Timeline Projection
+# 253. Gateway Projection
 
-Medical Records poderá consumir projeções resumidas da prescrição.
+Outra projeção poderá conter:
+
+```text
+Transactions
+
+Success Rate
+
+Failures
+
+Latency
+
+Retries
+```
 
 ---
 
 # 254. Search Projection
 
-A pesquisa textual poderá utilizar índices dedicados.
+Pesquisas poderão utilizar índices especializados para consultas financeiras.
 
 ---
 
 # 255. Cache
 
-Cache deverá acelerar operações de leitura.
+Cache poderá acelerar operações de leitura.
 
 Jamais substituir o Source of Truth.
 
@@ -3238,7 +3207,7 @@ Jamais substituir o Source of Truth.
 
 # 256. Cache Invalidation
 
-Atualizações relevantes deverão invalidar caches relacionados.
+Mudanças financeiras deverão invalidar automaticamente as projeções relacionadas.
 
 ---
 
@@ -3247,49 +3216,53 @@ Atualizações relevantes deverão invalidar caches relacionados.
 Indicadores sugeridos:
 
 ```text
-Prescriptions per Day
+Payments Processed
 
-Renewal Rate
+Revenue
 
-Cancellation Rate
+Average Ticket
 
-Average Signing Time
+Refund Rate
 
-Average Medications per Prescription
+Chargeback Rate
+
+Authorization Success
 ```
 
 ---
 
-# 258. Clinical Metrics
+# 258. Operational Metrics
 
 Exemplos:
 
 ```text
-Most Prescribed Medications
+Gateway Latency
 
-Average Treatment Duration
+Webhook Time
 
-Controlled Medication Usage
+Settlement Time
 
-Interaction Alerts
-```
+Retry Count
 
----
-
-# 259. Operational Metrics
-
-Exemplos:
-
-```text
 API Latency
+```
 
-Database Latency
+---
 
-Export Duration
+# 259. Business Metrics
 
-Signature Duration
+Exemplos:
 
-Integration Errors
+```text
+Revenue by Clinic
+
+Revenue by Payment Method
+
+Revenue by Professional
+
+Average Collection Time
+
+Payment Conversion Rate
 ```
 
 ---
@@ -3307,13 +3280,13 @@ Monitorar:
 ```text
 Database
 
+Gateway
+
+Webhook Queue
+
 Event Bus
 
-Signature Provider
-
-Medication Catalog
-
-Clinical Rules Engine
+Bank APIs
 ```
 
 ---
@@ -3323,24 +3296,24 @@ Clinical Rules Engine
 Exemplos:
 
 ```text
-Falha na assinatura
+Gateway Offline
 
-Falha de exportação
+Webhook Failure
 
-Evento não publicado
+Duplicate Payment
 
-Fila indisponível
+Settlement Failure
 
-Integração interrompida
+Timeout
 
-Erro de catálogo
+Chargeback Notification Failure
 ```
 
 ---
 
 # 263. Recovery
 
-Falhas deverão permitir recuperação sem perda de integridade da prescrição.
+Falhas deverão permitir recuperação sem perda da integridade financeira.
 
 ---
 
@@ -3349,31 +3322,29 @@ Falhas deverão permitir recuperação sem perda de integridade da prescrição.
 Mesmo após falhas deverão permanecer preservados:
 
 ```text
-Prescription
+Payment
 
-Items
+Transaction
+
+Refund
+
+Chargeback
 
 Audit
-
-Signature
-
-History
 ```
 
 ---
 
 # 265. Checklists
 
-## Criar Prescrição
+## Criar Pagamento
 
 ```text
-[ ] Paciente válido
+[ ] Invoice localizada
 
-[ ] Encounter válido
+[ ] Valor validado
 
-[ ] Profissional autorizado
-
-[ ] Itens válidos
+[ ] Método informado
 
 [ ] Auditoria criada
 
@@ -3382,40 +3353,12 @@ History
 
 ---
 
-## Assinar Prescrição
+## Autorizar Pagamento
 
 ```text
-[ ] Todas as validações executadas
+[ ] Gateway disponível
 
-[ ] Assinatura registrada
-
-[ ] Auditoria criada
-
-[ ] Evento publicado
-```
-
----
-
-## Renovação
-
-```text
-[ ] Prescrição original localizada
-
-[ ] Nova entidade criada
-
-[ ] Relação preservada
-
-[ ] Histórico preservado
-```
-
----
-
-## Cancelamento
-
-```text
-[ ] Justificativa registrada
-
-[ ] Auditoria criada
+[ ] Idempotência validada
 
 [ ] Status atualizado
 
@@ -3424,16 +3367,44 @@ History
 
 ---
 
-## Exportação
+## Capturar Pagamento
 
 ```text
-[ ] Permissão validada
+[ ] Autorização válida
 
-[ ] Formato suportado
+[ ] Captura realizada
 
 [ ] Auditoria registrada
 
-[ ] Exportação concluída
+[ ] Histórico preservado
+```
+
+---
+
+## Reembolso
+
+```text
+[ ] Pagamento localizado
+
+[ ] Valor permitido
+
+[ ] Histórico preservado
+
+[ ] Evento publicado
+```
+
+---
+
+## Chargeback
+
+```text
+[ ] Notificação validada
+
+[ ] Pagamento localizado
+
+[ ] Auditoria criada
+
+[ ] Status atualizado
 ```
 
 ---
@@ -3441,21 +3412,21 @@ History
 # 266. Checklist de Code Review
 
 ```text
-[ ] Sem alteração em prescrições assinadas
-
 [ ] Aggregate preservado
+
+[ ] Idempotência implementada
+
+[ ] Auditoria registrada
 
 [ ] Eventos publicados
 
-[ ] Auditoria implementada
+[ ] APIs documentadas
 
 [ ] Testes atualizados
 
-[ ] APIs documentadas
-
 [ ] Tenant Isolation preservado
 
-[ ] Sem acoplamento à infraestrutura
+[ ] Gateways desacoplados
 ```
 
 ---
@@ -3465,7 +3436,7 @@ History
 Uma funcionalidade somente será considerada concluída quando atender:
 
 ```text
-Integridade
+Integridade Financeira
 
 +
 
@@ -3505,15 +3476,15 @@ O domínio deverá possuir cobertura automatizada para regras críticas.
 Cobrir:
 
 ```text
-Prescription
+Payment
 
-PrescriptionItem
+Transaction
 
-Renewal
+Refund
 
-Signature
+Chargeback
 
-Cancellation
+Settlement
 
 Validation
 ```
@@ -3527,22 +3498,22 @@ Validar:
 ```text
 Persistence
 
-API
+Gateway
 
-Event Bus
+Webhook
 
 Audit
 
-Export
+Event Bus
 
-Templates
+Reconciliation
 ```
 
 ---
 
 # 271. Testes de Concorrência
 
-Validar múltiplas operações simultâneas sobre prescrições em Draft.
+Validar processamento simultâneo da mesma cobrança.
 
 ---
 
@@ -3555,9 +3526,9 @@ Permissions
 
 Tenant Isolation
 
-Signature Integrity
+Gateway Validation
 
-Export Rules
+Webhook Signature
 
 Audit Trail
 ```
@@ -3569,15 +3540,15 @@ Audit Trail
 Avaliar:
 
 ```text
+Gateway Throughput
+
+Settlement
+
 Search
 
-Export
+Large Volumes
 
-Bulk Operations
-
-Read Models
-
-API Response Time
+Webhook Queue
 ```
 
 ---
@@ -3589,78 +3560,78 @@ Events preserve history.
 
 Aggregate controls consistency.
 
-Signed Prescriptions remain immutable.
+Payments preserve identity.
 
-Queries never change domain state.
+Read Models never modify domain state.
 
 Commands preserve business rules.
 
-Read Models never become Source of Truth.
-
 Audit remains mandatory.
+
+Payments remain the Source of Truth.
 ```
 
 ---
 
 # 275. Decisões Arquiteturais e de Produto
 
-## ADR-1071
+## ADR-1191
 
-Eventos de domínio serão publicados após alterações relevantes.
+Eventos serão publicados após alterações relevantes.
 
 ---
 
-## ADR-1072
+## ADR-1192
 
 Payloads permanecerão mínimos e versionados.
 
 ---
 
-## ADR-1073
+## ADR-1193
 
 CQRS poderá ser adotado sem remodelar o domínio.
 
 ---
 
-## ADR-1074
+## ADR-1194
 
 Read Models especializados serão permitidos.
 
 ---
 
-## ADR-1075
+## ADR-1195
 
-Medical Records consumirá projeções da Timeline.
-
----
-
-## ADR-1076
-
-Toda exportação permanecerá auditável.
+Finance consumirá eventos financeiros publicados.
 
 ---
 
-## ADR-1077
+## ADR-1196
+
+Toda movimentação financeira permanecerá auditável.
+
+---
+
+## ADR-1197
 
 Testes automatizados serão obrigatórios para regras críticas.
 
 ---
 
-## ADR-1078
+## ADR-1198
 
-Observabilidade será parte integrante da arquitetura.
+Observabilidade fará parte da arquitetura padrão.
 
 ---
 
-## ADR-1079
+## ADR-1199
 
 Eventos deverão ser idempotentes.
 
 ---
 
-## ADR-1080
+## ADR-1200
 
-Prescriptions permanecerá desacoplado dos módulos consumidores.
+Payments permanecerá desacoplado dos módulos consumidores.
 
 ---
 
@@ -3679,42 +3650,41 @@ Na Parte 7 serão apresentados:
 
 # 277. Arquitetura Consolidada
 
-O módulo Prescriptions deverá permanecer responsável exclusivamente pela gestão das ordens terapêuticas emitidas por profissionais de saúde.
+O módulo Payments deverá permanecer responsável exclusivamente pelo processamento e liquidação das transações financeiras da plataforma.
 
 Seu domínio deverá permanecer desacoplado de:
 
+- Finance
 - Medical Records
-- Pharmacy
-- Inventory
-- Billing
-- Medication Administration
+- Patients
+- Notifications
+- Analytics
+- AI
+
+Esses módulos apenas consomem eventos produzidos pelo Payments.
 
 ---
 
 # 278. Arquitetura Conceitual
 
 ```text
-Medical Records
+Invoice
 
 ↓
 
-Encounter
+Payment
 
 ↓
 
-Prescription
+Transaction
 
 ↓
 
-Prescription Items
+Gateway
 
 ↓
 
-Clinical Validation
-
-↓
-
-Signature
+Settlement
 
 ↓
 
@@ -3725,62 +3695,69 @@ Events
 Consumers
 ```
 
+O fluxo deverá permanecer consistente durante todo o ciclo de vida financeiro.
+
 ---
 
 # 279. Responsabilidade
 
-Prescriptions deverá responder apenas:
+Payments deverá responder apenas:
 
 ```text
-Qual tratamento foi prescrito?
+O pagamento foi realizado?
+
+Qual foi o método utilizado?
+
+Qual o status da transação?
+
+Existe reembolso?
+
+Existe chargeback?
 ```
 
 Jamais:
 
 ```text
-O medicamento foi administrado?
+Quanto deve ser cobrado?
 
-O paciente tomou?
+Qual é o preço do procedimento?
 
-Existe estoque?
+Qual serviço foi contratado?
 
-A farmácia dispensou?
+Como a receita será contabilizada?
 ```
 
-Essas responsabilidades pertencem a outros domínios.
+Essas responsabilidades pertencem aos módulos Finance e Accounting.
 
 ---
 
 # 280. Relação com Outros Módulos
 
 ```text
-Patients
+Finance
      │
      ▼
-Medical Records
-     │
-     ▼
-Prescriptions
+Payments
      │
  ┌───┼──────────────┐
  ▼   ▼              ▼
-Notifications   Analytics   AI
+Notifications   Reports   Analytics
 ```
 
-Todos os módulos deverão consumir a prescrição através de interfaces oficiais.
+Payments fornece o contexto financeiro para os demais módulos.
 
 ---
 
 # 281. Anti-Corruption Layer
 
-Integrações externas nunca deverão conhecer a estrutura interna do Aggregate.
+Integrações externas nunca deverão conhecer a estrutura interna do Aggregate Payment.
 
-Todo acesso deverá ocorrer através de:
+Toda comunicação deverá ocorrer através de:
 
 - APIs públicas;
-- eventos;
-- adaptadores;
-- contratos versionados.
+- eventos de domínio;
+- contratos versionados;
+- adaptadores.
 
 ---
 
@@ -3789,22 +3766,24 @@ Todo acesso deverá ocorrer através de:
 O domínio deverá suportar futuras integrações com:
 
 ```text
-FHIR MedicationRequest
+Open Finance
 
-FHIR Medication
+Instant Payments
 
-National ePrescription
+PIX Automático
 
-Digital Signature Providers
+Recurring Payments
 
-Clinical Decision Support Systems
+Subscription Billing
 
-Medication Knowledge Bases
+International Payments
 
-International Standards
+Digital Wallets
+
+Cryptocurrency Gateways
 ```
 
-Sem necessidade de remodelar a arquitetura central.
+Sem necessidade de remodelar o Aggregate principal.
 
 ---
 
@@ -3812,12 +3791,13 @@ Sem necessidade de remodelar a arquitetura central.
 
 Possíveis funcionalidades futuras:
 
-- prescrições recorrentes;
-- terapias de longa duração;
-- protocolos clínicos;
-- prescrições colaborativas;
-- integração com farmácias;
-- integração nacional de prescrições eletrônicas.
+- pagamentos recorrentes;
+- assinaturas mensais;
+- parcelamentos inteligentes;
+- split de pagamentos;
+- antifraude com IA;
+- conciliação automática avançada;
+- pagamentos internacionais.
 
 ---
 
@@ -3826,19 +3806,21 @@ Possíveis funcionalidades futuras:
 Evitar:
 
 ```text
-Misturar estoque com prescrição.
+Misturar cobrança com pagamento.
 
-Modificar prescrições assinadas.
+Excluir pagamentos liquidados.
 
-Excluir prescrições emitidas.
+Acoplar o domínio a um gateway específico.
 
-Duplicar catálogo de medicamentos.
+Persistir dados completos de cartão.
 
-Acoplar regras ao provedor de assinatura.
+Ignorar idempotência.
 
-Misturar administração do medicamento com a ordem terapêutica.
+Permitir alteração de pagamentos liquidados.
 
-Persistir informações clínicas pertencentes ao Medical Records.
+Executar lógica financeira diretamente em webhooks.
+
+Misturar contabilidade com liquidação financeira.
 ```
 
 ---
@@ -3847,12 +3829,12 @@ Persistir informações clínicas pertencentes ao Medical Records.
 
 O domínio deverá permanecer válido mesmo após:
 
-- mudança de banco de dados;
-- troca de framework;
 - migração para microsserviços;
+- troca de gateway;
+- mudança de banco de dados;
 - adoção de Event Sourcing;
 - adoção completa de CQRS;
-- evolução das regulamentações.
+- integração com novos meios de pagamento.
 
 A modelagem deverá sobreviver às mudanças tecnológicas.
 
@@ -3863,82 +3845,84 @@ A modelagem deverá sobreviver às mudanças tecnológicas.
 Independentemente da evolução do MedFlow:
 
 ```text
-Prescription is immutable after signature.
+Payments process financial settlements.
 
-Prescription is not Medication Administration.
+Invoices define amounts due.
 
-History is permanent.
+Transactions preserve history.
+
+Refunds never replace payments.
+
+Chargebacks remain traceable.
 
 Audit is mandatory.
 
-Clinical decisions belong to professionals.
-
-Integrations never bypass the domain.
+External providers never control the domain.
 ```
 
-Esses princípios deverão orientar toda evolução futura.
+Esses princípios deverão permanecer inalterados.
 
 ---
 
 # 287. ADRs Finais
 
-## ADR-1081
+## ADR-1201
 
-Prescription continuará sendo o Aggregate Root exclusivo do domínio.
-
----
-
-## ADR-1082
-
-Prescrições assinadas permanecerão permanentemente imutáveis.
+Payment continuará sendo o Aggregate Root exclusivo do domínio.
 
 ---
 
-## ADR-1083
+## ADR-1202
 
-Toda renovação criará nova entidade.
-
----
-
-## ADR-1084
-
-A administração do medicamento permanecerá fora deste domínio.
+Pagamentos liquidados permanecerão imutáveis.
 
 ---
 
-## ADR-1085
+## ADR-1203
 
-O domínio será preparado para integração completa com FHIR MedicationRequest.
-
----
-
-## ADR-1086
-
-Toda alteração administrativa produzirá auditoria.
+Refunds criarão entidades independentes mantendo referência ao pagamento original.
 
 ---
 
-## ADR-1087
+## ADR-1204
 
-Integrações utilizarão eventos versionados e APIs estáveis.
-
----
-
-## ADR-1088
-
-Clinical Decision Support permanecerá desacoplado do Aggregate.
+Chargebacks preservarão todo o histórico financeiro.
 
 ---
 
-## ADR-1089
+## ADR-1205
 
-Prescriptions permanecerá independente do catálogo de medicamentos.
+Payments será preparado para integração com Open Finance.
 
 ---
 
-## ADR-1090
+## ADR-1206
 
-Prescriptions será a única fonte oficial das ordens terapêuticas emitidas na plataforma MedFlow.
+Toda alteração relevante produzirá auditoria obrigatória.
+
+---
+
+## ADR-1207
+
+Eventos permanecerão versionados e idempotentes.
+
+---
+
+## ADR-1208
+
+Read Models permanecerão desacoplados do Aggregate.
+
+---
+
+## ADR-1209
+
+Gateways externos nunca alterarão diretamente o domínio.
+
+---
+
+## ADR-1210
+
+Payments será a única fonte oficial das liquidações financeiras da plataforma MedFlow.
 
 ---
 
@@ -3947,55 +3931,66 @@ Prescriptions será a única fonte oficial das ordens terapêuticas emitidas na 
 | Item | Status |
 |------|--------|
 | Aggregate Root definido | ✓ |
-| Prescription Items modelados | ✓ |
-| Assinatura clínica | ✓ |
-| Renovações | ✓ |
-| Cancelamentos | ✓ |
+| Transactions modeladas | ✓ |
+| Refunds | ✓ |
+| Chargebacks | ✓ |
+| Parcelamentos | ✓ |
+| Gateways abstratos | ✓ |
+| Webhooks | ✓ |
 | Auditoria | ✓ |
 | LGPD | ✓ |
 | Multi-tenant | ✓ |
-| Multi-clinic | ✓ |
-| Eventos de domínio | ✓ |
+| Event Bus | ✓ |
 | CQRS preparado | ✓ |
 | Read Models | ✓ |
-| Integração FHIR preparada | ✓ |
+| Arquitetura Hexagonal | ✓ |
 | Observabilidade | ✓ |
 | KPIs | ✓ |
-| Testabilidade | ✓ |
-| Arquitetura Hexagonal | ✓ |
+| Conciliação | ✓ |
 | ADRs documentadas | ✓ |
 
 ---
 
 # 289. Definition of Success
 
-O módulo Prescriptions será considerado bem projetado quando:
+O módulo Payments será considerado bem projetado quando:
 
-- preservar a integridade das ordens terapêuticas;
-- impedir alterações indevidas após assinatura;
-- suportar milhões de prescrições;
-- manter histórico completo;
-- integrar-se facilmente com outros módulos;
+- preservar integralmente o histórico financeiro;
+- suportar múltiplos gateways sem alterar o domínio;
+- garantir idempotência em operações críticas;
+- manter rastreabilidade completa das transações;
+- suportar milhões de pagamentos;
 - permanecer desacoplado da infraestrutura;
 - atender requisitos regulatórios;
-- evoluir sem quebrar consumidores.
+- evoluir sem quebrar integrações existentes.
 
 ---
 
 # 290. Considerações Finais
 
-O módulo Prescriptions representa a formalização da decisão terapêutica tomada durante um atendimento.
+O módulo Payments representa o núcleo de liquidação financeira da plataforma MedFlow.
 
-Seu papel é garantir que cada prescrição emitida seja:
+Seu papel é garantir que toda movimentação financeira seja registrada de forma íntegra, auditável, segura e consistente.
 
-- íntegra;
-- rastreável;
-- auditável;
-- segura;
-- interoperável;
-- preparada para evolução futura.
+Todas as decisões arquiteturais apresentadas neste documento têm como objetivo preservar:
 
-Toda decisão arquitetural apresentada neste documento busca preservar esses princípios e garantir que o domínio permaneça sustentável por muitos anos.
+```text
+Integridade Financeira
+
+Auditabilidade
+
+Escalabilidade
+
+Confiabilidade
+
+Interoperabilidade
+
+Segurança
+
+Sustentabilidade
+```
+
+Esses princípios deverão orientar toda evolução futura do módulo.
 
 ---
 
@@ -4003,4 +3998,4 @@ Toda decisão arquitetural apresentada neste documento busca preservar esses pri
 
 | Versão | Data | Alterações | Responsável |
 |---------|------|------------|-------------|
-| 1.0 | 2026 | Criação da documentação oficial do módulo Prescriptions, incluindo modelagem de prescrições, assinatura clínica, itens, auditoria, segurança, integrações, arquitetura, CQRS, observabilidade e ADR-1031 a ADR-1090 | Equipe MedFlow |
+| 1.0 | 2026 | Criação da documentação oficial do módulo Payments, incluindo transações, gateways, PIX, cartões, reembolsos, chargebacks, conciliação, auditoria, CQRS, Event Bus, observabilidade e ADR-1151 a ADR-1210 | Equipe MedFlow |

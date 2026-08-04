@@ -1,8 +1,8 @@
-# Módulo de Agendamento (Scheduling)
+# Módulo de Prescrições (Prescriptions)
 
 | Campo | Valor |
 |-------|--------|
-| Documento | Scheduling |
+| Documento | Prescriptions |
 | Versão | 1.0 |
 | Status | Oficial |
 | Categoria | Modules |
@@ -13,29 +13,27 @@
 
 # 1. Visão Geral
 
-O módulo **Scheduling** é responsável pelo gerenciamento da agenda clínica da plataforma MedFlow.
+O módulo **Prescriptions** é responsável pelo gerenciamento das prescrições clínicas emitidas pelos profissionais de saúde.
 
-Seu objetivo é controlar disponibilidade, horários, bloqueios e reservas de atendimento.
+Ele representa a intenção terapêutica registrada durante um atendimento.
+
+A execução da terapia pelo paciente não faz parte deste domínio.
 
 ---
 
 # 2. Princípio Fundamental
 
 ```text
-Appointment
+Prescription
 
 ≠
 
-Encounter
+Medication History
 ```
 
-Appointment representa um horário reservado.
+Uma prescrição representa uma ordem médica.
 
-Encounter representa um atendimento clínico realizado.
-
-Um Appointment pode nunca acontecer.
-
-Um Encounter somente existe quando houve atendimento.
+O histórico medicamentoso representa aquilo que efetivamente foi utilizado pelo paciente.
 
 ---
 
@@ -44,37 +42,41 @@ Um Encounter somente existe quando houve atendimento.
 O módulo deverá responder:
 
 ```text
-Quem possui agenda?
+Quem prescreveu?
 
-Quais horários estão disponíveis?
+Para qual paciente?
 
-Quem marcou a consulta?
+Durante qual atendimento?
 
-Qual profissional atenderá?
+Quais medicamentos?
 
-Onde ocorrerá o atendimento?
+Qual dosagem?
 
-Qual o status do agendamento?
+Qual duração?
+
+Quais instruções?
+
+Qual o status da prescrição?
 ```
 
 ---
 
 # 4. Source of Truth
 
-Scheduling será o Source of Truth para:
+Prescriptions será o Source of Truth para:
 
 ```text
-Appointments
+Medical Prescriptions
 
-Schedules
+Medication Orders
 
-Availability
+Prescription Status
 
-Calendar Rules
+Prescription Items
 
-Time Slots
+Renewals
 
-Booking History
+Prescription Audit
 ```
 
 ---
@@ -83,15 +85,15 @@ Booking History
 
 O módulo será responsável por:
 
-- Agenda
-- Horários disponíveis
-- Agendamentos
-- Cancelamentos
-- Reagendamentos
-- Bloqueios
-- Disponibilidade
-- Calendários
-- Fila de espera
+- Prescrições
+- Itens prescritos
+- Posologia
+- Frequência
+- Duração
+- Renovação
+- Cancelamento
+- Assinatura
+- Auditoria
 
 ---
 
@@ -99,82 +101,69 @@ O módulo será responsável por:
 
 Não pertence ao módulo:
 
-- Prontuário
+- Estoque
+- Farmácia
+- Dispensação
+- Administração do medicamento
+- Histórico medicamentoso
 - Diagnósticos
-- Prescrições
-- Pagamentos
-- Notificações
-- Atendimento clínico
 
 ---
 
 # 7. Filosofia
 
-Scheduling administra tempo.
+Prescriptions registra decisões terapêuticas.
 
-Medical Records administra informações clínicas.
-
-Essa separação deverá permanecer durante toda evolução da plataforma.
+A administração do tratamento pertence a outros domínios.
 
 ---
 
 # 8. Bounded Context
 
 ```text
-Patients
-
-↓
-
-Scheduling
-
-↓
-
-Appointments
-
-↓
-
 Medical Records
 
 ↓
 
 Encounter
+
+↓
+
+Prescriptions
+
+↓
+
+Medication
+
+↓
+
+Notifications
 ```
 
 ---
 
 # 9. Domain Boundary
 
-Scheduling nunca deverá armazenar:
+Medical Records poderá referenciar prescrições.
 
-```text
-SOAP
-
-Diagnósticos
-
-Medicamentos
-
-Resultados de exames
-
-Notas clínicas
-```
+Mas nunca armazenará sua lógica.
 
 ---
 
 # 10. Aggregate Root
 
 ```text
-Appointment
+Prescription
 
 ├── id
 ├── organizationId
 ├── patientId
+├── encounterId
 ├── professionalId
-├── clinicId
-├── scheduleId
 ├── status
-├── startsAt
-├── endsAt
-├── createdAt
+├── issuedAt
+├── expiresAt
+├── signedAt
 └── metadata
 ```
 
@@ -182,7 +171,7 @@ Appointment
 
 # 11. Identity
 
-Todo Appointment possuirá:
+Toda Prescription possuirá:
 
 ```text
 id
@@ -194,7 +183,7 @@ imutável.
 
 # 12. Ownership
 
-Todo Appointment pertence a:
+Toda prescrição pertence a:
 
 ```text
 Organization
@@ -205,331 +194,290 @@ Patient
 
 +
 
-Professional
+Encounter
 ```
 
 ---
 
-# 13. Clinic Context
+# 13. Professional
 
-O atendimento poderá ocorrer em:
-
-```text
-Clinic
-
-Telemedicine
-
-Home Care
-```
+Toda prescrição deverá registrar seu autor.
 
 ---
 
-# 14. Appointment Status
+# 14. Signature
+
+Uma prescrição poderá exigir assinatura clínica.
+
+---
+
+# 15. Status
 
 Estados possíveis:
 
 ```text
-scheduled
+draft
 
-confirmed
-
-checked_in
-
-completed
+signed
 
 cancelled
 
-no_show
+expired
 
-rescheduled
+renewed
 ```
 
 ---
 
-# 15. Scheduled
+# 16. Draft
 
-Representa um horário reservado.
-
----
-
-# 16. Confirmed
-
-O paciente confirmou presença.
+Enquanto estiver em Draft, a prescrição poderá sofrer alterações.
 
 ---
 
-# 17. Check-in
+# 17. Signed
 
-Representa a chegada do paciente.
+Após assinatura:
 
-Não significa início do atendimento.
-
----
-
-# 18. Completed
-
-O Appointment foi concluído.
-
-Poderá originar um Encounter.
+- preservar histórico;
+- evitar alterações silenciosas;
+- registrar auditoria.
 
 ---
 
-# 19. No Show
+# 18. Cancellation
 
-Paciente não compareceu.
-
----
-
-# 20. Cancelled
-
-Cancelamentos deverão preservar histórico.
+Cancelamentos nunca deverão remover a prescrição.
 
 ---
 
-# 21. Rescheduled
+# 19. Expiration
 
-Reagendamento deverá gerar vínculo entre os agendamentos.
-
----
-
-# 22. Schedule
-
-Cada profissional poderá possuir uma agenda.
+Prescrições poderão possuir validade.
 
 ---
 
-# 23. Schedule Entity
+# 20. Renewal
+
+Renovações deverão gerar novo registro.
+
+Nunca sobrescrever a prescrição original.
+
+---
+
+# 21. Prescription Items
+
+Uma prescrição poderá conter diversos medicamentos.
+
+---
+
+# 22. Prescription Item
 
 ```text
-Schedule
+PrescriptionItem
 
 ├── id
-├── organizationId
-├── professionalId
-├── timezone
-├── status
+├── prescriptionId
+├── medication
+├── dosage
+├── route
+├── frequency
+├── duration
+├── quantity
+├── instructions
 └── metadata
 ```
 
 ---
 
-# 24. Availability
+# 23. Medication
 
-Disponibilidade representa períodos livres para agendamento.
-
----
-
-# 25. Availability Entity
-
-```text
-Availability
-
-├── id
-├── scheduleId
-├── startsAt
-├── endsAt
-├── recurrence
-└── metadata
-```
+O domínio deverá permitir medicamentos padronizados ou cadastrados pela organização.
 
 ---
 
-# 26. Time Slots
+# 24. Medication Reference
 
-A agenda poderá ser dividida em Time Slots.
+O módulo poderá referenciar catálogo próprio ou externo.
 
 ---
 
-# 27. Slot Duration
+# 25. Route
 
 Exemplos:
 
 ```text
-15 min
+Oral
 
-20 min
+IV
 
-30 min
+IM
 
-45 min
+Subcutaneous
 
-60 min
+Topical
+
+Inhalation
+
+Ophthalmic
 ```
 
 ---
 
-# 28. Recurrence
-
-Disponibilidades poderão ser recorrentes.
-
----
-
-# 29. Recurrence Types
+# 26. Frequency
 
 Exemplos:
 
 ```text
-Daily
+1x/day
+
+2x/day
+
+Every 8 hours
 
 Weekly
 
 Monthly
 
-Custom
+As Needed
 ```
 
 ---
 
-# 30. Exceptions
+# 27. Dosage
 
-Regras recorrentes poderão possuir exceções.
+A dosagem deverá possuir estrutura.
 
----
-
-# 31. Blocked Time
-
-Profissionais poderão bloquear horários.
+Não apenas texto.
 
 ---
 
-# 32. Block Entity
-
-```text
-ScheduleBlock
-
-├── id
-├── scheduleId
-├── startsAt
-├── endsAt
-├── reason
-└── metadata
-```
-
----
-
-# 33. Block Reasons
+# 28. Units
 
 Exemplos:
 
 ```text
-Vacation
+mg
 
-Lunch
+mL
 
-Meeting
+IU
 
-Holiday
+Drops
 
-Training
+Tablets
 
-Personal
+Capsules
 ```
 
 ---
 
-# 34. Working Hours
+# 29. Duration
 
-Cada agenda deverá possuir horário de funcionamento.
-
----
-
-# 35. Timezone
-
-Toda agenda deverá utilizar timezone explícita.
+A duração deverá ser registrada separadamente.
 
 ---
 
-# 36. Double Booking
+# 30. Quantity
 
-Por padrão, não será permitido conflito de horários.
-
----
-
-# 37. Overbooking
-
-Organizações poderão permitir overbooking mediante configuração.
+Quantidade prescrita deverá ser explícita.
 
 ---
 
-# 38. Waiting List
+# 31. Instructions
 
-O módulo poderá manter lista de espera.
+Campo destinado às orientações do profissional.
 
 ---
 
-# 39. Waiting List Entity
+# 32. Free Text
+
+Texto livre continuará permitido.
+
+---
+
+# 33. Structured Fields
+
+Sempre que possível, utilizar campos estruturados.
+
+---
+
+# 34. Medication Catalog
+
+O catálogo de medicamentos permanecerá desacoplado do domínio.
+
+---
+
+# 35. Controlled Medications
+
+O domínio deverá permitir requisitos adicionais para medicamentos controlados.
+
+---
+
+# 36. Validation
+
+Antes da assinatura deverão ser verificadas:
 
 ```text
-WaitingList
+Itens
 
-├── id
-├── patientId
-├── professionalId
-├── preferredDate
-├── priority
-└── metadata
-```
+Paciente
 
----
-
-# 40. Booking Rules
-
-O domínio deverá validar conflitos antes da confirmação.
-
----
-
-# 41. Validation
-
-Validar:
-
-```text
-Disponibilidade
-
-Bloqueios
-
-Conflitos
-
-Permissões
+Profissional
 
 Status
+
+Permissões
 ```
 
 ---
 
-# 42. Reschedule
+# 37. Clinical Context
 
-Reagendamentos deverão preservar histórico.
-
----
-
-# 43. Cancellation Policy
-
-Políticas de cancelamento poderão ser configuráveis.
+Toda prescrição deverá estar relacionada a um contexto clínico.
 
 ---
 
-# 44. Appointment History
+# 38. Encounter Relationship
 
-Todo agendamento deverá manter histórico completo.
-
----
-
-# 45. Audit
-
-Alterações relevantes deverão gerar auditoria.
-
----
-
-# 46. Audit Entity
+Fluxo:
 
 ```text
-AppointmentAudit
+Encounter
+
+↓
+
+Prescription
+
+↓
+
+Prescription Items
+```
+
+---
+
+# 39. Versioning
+
+Mudanças relevantes deverão preservar histórico.
+
+---
+
+# 40. Audit
+
+Toda alteração relevante deverá gerar auditoria.
+
+---
+
+# 41. Audit Entity
+
+```text
+PrescriptionAudit
 
 ├── id
-├── appointmentId
+├── prescriptionId
 ├── actorId
 ├── action
-├── occurredAt
+├── timestamp
 ├── before
 ├── after
 └── metadata
@@ -537,42 +485,118 @@ AppointmentAudit
 
 ---
 
-# 47. Events
+# 42. Audit Actions
 
-Scheduling poderá publicar:
+Exemplos:
 
 ```text
-appointment.created
+Created
 
-appointment.confirmed
+Updated
 
-appointment.cancelled
+Signed
 
-appointment.rescheduled
+Cancelled
 
-appointment.checked_in
-
-appointment.completed
+Renewed
 ```
 
 ---
 
-# 48. APIs Conceituais
+# 43. Timeline
+
+Medical Records poderá exibir prescrições na Timeline Clínica.
+
+---
+
+# 44. Events
+
+O módulo poderá publicar:
 
 ```text
-GET /appointments
+prescription.created
 
-GET /appointments/{id}
+prescription.signed
 
-POST /appointments
+prescription.cancelled
 
-PUT /appointments/{id}
+prescription.renewed
+```
 
-POST /appointments/{id}/confirm
+---
 
-POST /appointments/{id}/cancel
+# 45. APIs Conceituais
 
-POST /appointments/{id}/reschedule
+```text
+GET /prescriptions
+
+GET /prescriptions/{id}
+
+POST /prescriptions
+
+PUT /prescriptions/{id}
+
+POST /prescriptions/{id}/sign
+
+POST /prescriptions/{id}/cancel
+
+POST /prescriptions/{id}/renew
+```
+
+---
+
+# 46. Commands
+
+Preferir:
+
+```text
+createPrescription()
+
+signPrescription()
+
+cancelPrescription()
+
+renewPrescription()
+
+addMedication()
+```
+
+---
+
+# 47. Search
+
+Permitir busca por:
+
+```text
+Paciente
+
+Profissional
+
+Medicamento
+
+Status
+
+Data
+
+Encounter
+```
+
+---
+
+# 48. Observability
+
+Métricas:
+
+```text
+Prescriptions Created
+
+Signed
+
+Cancelled
+
+Renewed
+
+Average Items
 ```
 
 ---
@@ -580,19 +604,17 @@ POST /appointments/{id}/reschedule
 # 49. Domain Invariants
 
 ```text
-Every Appointment belongs to one Organization.
+Every Prescription belongs to one Organization.
 
-Every Appointment belongs to one Patient.
+Every Prescription belongs to one Patient.
 
-Every Appointment belongs to one Professional.
+Every Prescription belongs to one Encounter.
 
-Appointments preserve history.
+Signed Prescriptions preserve history.
 
-Scheduling never stores clinical information.
+Renewals create new Prescriptions.
 
-Availability controls booking.
-
-Double booking is prevented by default.
+Prescription Items belong to exactly one Prescription.
 ```
 
 ---
@@ -601,665 +623,621 @@ Double booking is prevented by default.
 
 Na Parte 2 serão abordados:
 
-- Calendários
-- Disponibilidade avançada
-- Regras recorrentes
-- Feriados
-- Telemedicina
-- Check-in
-- Fila de espera avançada
-- Auditoria
-- ADR-1091 em diante
+- Assinatura digital
+- Renovações
+- Medicamentos controlados
+- Interações medicamentosas
+- Validações
+- Auditoria avançada
+- APIs
+- Eventos
+- ADR-1031 em diante
 ---
 
-# 51. Calendários
+# 51. Assinatura Clínica
 
-Cada profissional poderá possuir um ou mais calendários operacionais.
+Uma prescrição somente deverá produzir efeitos oficiais após sua assinatura.
 
-Exemplos:
-
-```text
-Consultório
-
-Telemedicina
-
-Cirurgias
-
-Plantão
-
-Procedimentos
-```
+Enquanto permanecer em estado **Draft**, ela representa apenas uma proposta terapêutica.
 
 ---
 
-# 52. Calendar Entity
-
-```text
-Calendar
-
-├── id
-├── organizationId
-├── scheduleId
-├── name
-├── timezone
-├── status
-└── metadata
-```
-
----
-
-# 53. Calendar Status
-
-Estados possíveis:
-
-```text
-active
-
-inactive
-
-archived
-```
-
----
-
-# 54. Calendar Rules
-
-Cada calendário poderá possuir regras independentes de disponibilidade.
-
----
-
-# 55. Working Days
-
-Exemplo:
-
-```text
-Monday
-
-Tuesday
-
-Wednesday
-
-Thursday
-
-Friday
-```
-
----
-
-# 56. Business Hours
-
-Cada dia poderá possuir horários distintos.
-
-Exemplo:
-
-```text
-Monday
-
-08:00 - 12:00
-
-13:30 - 18:00
-```
-
----
-
-# 57. Holiday Rules
-
-A agenda poderá considerar feriados nacionais, estaduais, municipais ou internos.
-
----
-
-# 58. Holiday Entity
-
-```text
-Holiday
-
-├── id
-├── organizationId
-├── date
-├── description
-├── scope
-└── metadata
-```
-
----
-
-# 59. Holiday Scope
-
-Exemplos:
-
-```text
-National
-
-State
-
-City
-
-Organization
-
-Clinic
-```
-
----
-
-# 60. Availability Generation
-
-Time Slots poderão ser gerados automaticamente a partir das regras da agenda.
-
----
-
-# 61. Slot Generator
+# 52. Signature Workflow
 
 Fluxo conceitual:
 
 ```text
-Working Hours
+Draft
 
 ↓
 
-Availability Rules
+Validation
 
 ↓
 
-Time Slots
+Professional Signature
+
+↓
+
+Signed
 ```
 
 ---
 
-# 62. Dynamic Availability
-
-A disponibilidade deverá ser recalculada sempre que ocorrer:
-
-- novo agendamento;
-- cancelamento;
-- bloqueio;
-- alteração de horário.
-
----
-
-# 63. Slot Status
-
-Estados possíveis:
+# 53. Signature Entity
 
 ```text
-Available
-
-Reserved
-
-Blocked
-
-Unavailable
-```
-
----
-
-# 64. Slot Lock
-
-Durante o processo de agendamento o horário poderá ser temporariamente reservado.
-
----
-
-# 65. Lock Timeout
-
-Locks deverão expirar automaticamente caso a reserva não seja concluída.
-
----
-
-# 66. Concurrency
-
-O domínio deverá impedir reservas simultâneas para o mesmo horário.
-
----
-
-# 67. Optimistic Locking
-
-Sempre que possível utilizar mecanismos de concorrência otimista.
-
----
-
-# 68. Conflict Detection
-
-Antes da confirmação validar:
-
-```text
-Professional
-
-Room
-
-Equipment
-
-Time
-
-Organization Rules
-```
-
----
-
-# 69. Appointment Types
-
-Exemplos:
-
-```text
-Consultation
-
-Return
-
-Exam
-
-Procedure
-
-Telemedicine
-```
-
----
-
-# 70. Duration Rules
-
-Cada tipo de atendimento poderá possuir duração padrão.
-
----
-
-# 71. Buffer Time
-
-O sistema poderá reservar tempo adicional antes ou após um atendimento.
-
----
-
-# 72. Buffer Types
-
-Exemplos:
-
-```text
-Before Appointment
-
-After Appointment
-
-Cleaning
-
-Preparation
-```
-
----
-
-# 73. Room Reservation
-
-Consultórios poderão ser reservados juntamente com o agendamento.
-
----
-
-# 74. Room Entity
-
-```text
-Room
+PrescriptionSignature
 
 ├── id
-├── clinicId
+├── prescriptionId
+├── professionalId
+├── signedAt
+├── signatureType
+├── metadata
+```
+
+---
+
+# 54. Signature Types
+
+Exemplos:
+
+```text
+Electronic
+
+Digital Certificate
+
+Biometric (Future)
+
+Institutional
+```
+
+---
+
+# 55. Signature Integrity
+
+Após assinatura:
+
+- preservar integridade;
+- impedir alterações silenciosas;
+- registrar auditoria completa.
+
+---
+
+# 56. Amendment
+
+Caso seja necessário corrigir uma prescrição assinada:
+
+```text
+Original Prescription
+
+↓
+
+Amendment
+
+↓
+
+New Version
+```
+
+Nunca alterar diretamente o documento original.
+
+---
+
+# 57. Renewal
+
+Renovação representa uma nova decisão clínica.
+
+---
+
+# 58. Renewal Relationship
+
+```text
+Prescription A
+
+↓
+
+Renewed
+
+↓
+
+Prescription B
+```
+
+A relação entre ambas deverá permanecer registrada.
+
+---
+
+# 59. Renewal Entity
+
+```text
+PrescriptionRenewal
+
+├── originalPrescriptionId
+├── renewedPrescriptionId
+├── renewedBy
+├── renewedAt
+└── reason
+```
+
+---
+
+# 60. Renewal Rules
+
+Uma renovação poderá:
+
+- manter medicamentos;
+- alterar dosagens;
+- adicionar novos itens;
+- remover itens.
+
+Sempre criando uma nova prescrição.
+
+---
+
+# 61. Cancellation
+
+Cancelamentos deverão informar motivo.
+
+---
+
+# 62. Cancellation Entity
+
+```text
+PrescriptionCancellation
+
+├── prescriptionId
+├── cancelledBy
+├── cancelledAt
+├── reason
+└── metadata
+```
+
+---
+
+# 63. Cancellation History
+
+O histórico deverá permanecer acessível.
+
+---
+
+# 64. Controlled Medications
+
+Medicamentos controlados poderão exigir validações adicionais.
+
+---
+
+# 65. Regulatory Compliance
+
+O domínio deverá permitir adaptação às regulamentações locais.
+
+A lógica regulatória não deverá ficar espalhada pelo código.
+
+---
+
+# 66. Prescription Validation
+
+Antes da assinatura validar:
+
+```text
+Paciente
+
+Profissional
+
+Permissões
+
+Itens
+
+Status
+
+Validade
+```
+
+---
+
+# 67. Clinical Validation
+
+Validações clínicas poderão evoluir ao longo do tempo.
+
+---
+
+# 68. Medication Interaction
+
+O domínio deverá permitir integração com mecanismos de verificação de interação medicamentosa.
+
+---
+
+# 69. Interaction Source
+
+As regras poderão ser provenientes de:
+
+```text
+Internal Database
+
+External API
+
+Clinical Knowledge Base
+```
+
+---
+
+# 70. Interaction Result
+
+Exemplo:
+
+```text
+No Interaction
+
+Minor
+
+Moderate
+
+Severe
+
+Contraindicated
+```
+
+---
+
+# 71. Decision Support
+
+Alertas representam apoio à decisão.
+
+Nunca impedem automaticamente a decisão clínica.
+
+---
+
+# 72. Override
+
+O profissional poderá prosseguir quando permitido.
+
+Sempre registrando justificativa.
+
+---
+
+# 73. Override Entity
+
+```text
+InteractionOverride
+
+├── prescriptionId
+├── interactionId
+├── professionalId
+├── reason
+├── createdAt
+└── metadata
+```
+
+---
+
+# 74. Allergy Check
+
+O módulo poderá consultar alergias registradas no Medical Records.
+
+Nunca armazená-las localmente.
+
+---
+
+# 75. Pregnancy Alerts
+
+Especialidades poderão adicionar verificações específicas.
+
+---
+
+# 76. Pediatric Validation
+
+O domínio deverá permitir regras específicas para pacientes pediátricos.
+
+---
+
+# 77. Renal Alerts
+
+Integrações futuras poderão sugerir ajustes terapêuticos conforme função renal.
+
+---
+
+# 78. Hepatic Alerts
+
+A arquitetura deverá permitir verificações relacionadas à função hepática.
+
+---
+
+# 79. Clinical Decision Support
+
+Prescriptions poderá integrar motores especializados de suporte à decisão clínica.
+
+---
+
+# 80. Separation of Concerns
+
+O mecanismo de decisão clínica permanecerá desacoplado do Aggregate Prescription.
+
+---
+
+# 81. Prescription Templates
+
+Profissionais poderão utilizar modelos reutilizáveis.
+
+---
+
+# 82. Template Entity
+
+```text
+PrescriptionTemplate
+
+├── id
+├── organizationId
 ├── name
-├── capacity
-├── status
+├── specialty
+├── items
+├── createdBy
 └── metadata
 ```
 
 ---
 
-# 75. Equipment Reservation
+# 83. Favorite Prescriptions
 
-Equipamentos poderão ser vinculados ao horário reservado.
+Profissionais poderão salvar prescrições favoritas.
 
 ---
 
-# 76. Resource Booking
+# 84. Favorites
 
-Fluxo:
+Esses modelos pertencem ao profissional.
+
+Não representam prescrições emitidas.
+
+---
+
+# 85. Template Versioning
+
+Mudanças deverão preservar histórico.
+
+---
+
+# 86. Template Sharing
+
+Organizações poderão compartilhar templates entre profissionais.
+
+---
+
+# 87. Bulk Prescription
+
+Uma prescrição poderá conter dezenas de medicamentos.
+
+A arquitetura deverá suportar esse cenário.
+
+---
+
+# 88. Maximum Limits
+
+Limites deverão ser configuráveis.
+
+Nunca hardcoded.
+
+---
+
+# 89. Printing
+
+O domínio deverá permitir geração de versão para impressão.
+
+---
+
+# 90. Export
+
+Exportações poderão utilizar:
 
 ```text
-Appointment
+PDF
+
+FHIR
+
+HL7
+
+Other Standards
+```
+
+---
+
+# 91. QR Code
+
+No futuro, prescrições poderão possuir QR Code para verificação.
+
+---
+
+# 92. External Verification
+
+A arquitetura deverá permitir validação externa da autenticidade da prescrição.
+
+---
+
+# 93. Prescription Timeline
+
+Medical Records poderá exibir:
+
+```text
+Prescription Created
 
 ↓
 
-Professional
-
-+
-
-Room
-
-+
-
-Equipment
-```
-
----
-
-# 77. Telemedicine
-
-O módulo deverá suportar consultas remotas.
-
----
-
-# 78. Telemedicine Entity
-
-```text
-TelemedicineSession
-
-├── id
-├── appointmentId
-├── provider
-├── meetingUrl
-├── status
-└── metadata
-```
-
----
-
-# 79. Meeting Providers
-
-Exemplos:
-
-```text
-Zoom
-
-Google Meet
-
-Microsoft Teams
-
-Internal Platform
-```
-
----
-
-# 80. Waiting Room
-
-Consultas remotas poderão possuir sala de espera virtual.
-
----
-
-# 81. Check-in
-
-O paciente poderá realizar check-in antes do atendimento.
-
----
-
-# 82. Check-in Methods
-
-Exemplos:
-
-```text
-Reception
-
-QR Code
-
-Mobile App
-
-Patient Portal
-```
-
----
-
-# 83. Early Check-in
-
-A organização poderá configurar antecedência máxima para check-in.
-
----
-
-# 84. Queue Management
-
-Após o check-in o paciente poderá entrar na fila de atendimento.
-
----
-
-# 85. Queue Entity
-
-```text
-AppointmentQueue
-
-├── id
-├── appointmentId
-├── position
-├── estimatedTime
-└── metadata
-```
-
----
-
-# 86. Queue Priority
-
-Exemplos:
-
-```text
-Normal
-
-Priority
-
-Emergency
-```
-
----
-
-# 87. Waiting List
-
-Caso exista cancelamento, pacientes poderão ser promovidos automaticamente.
-
----
-
-# 88. Waiting List Promotion
-
-Fluxo:
-
-```text
-Cancellation
+Signed
 
 ↓
 
-Waiting List
+Renewed
 
 ↓
 
-Offer
-
-↓
-
-Confirmation
-
-↓
-
-Appointment
+Cancelled
 ```
 
 ---
 
-# 89. Confirmation Window
+# 94. Historical Integrity
 
-A oferta poderá expirar após tempo configurável.
-
----
-
-# 90. Recurrence
-
-Consultas poderão ser recorrentes.
+Nenhuma prescrição assinada deverá desaparecer do histórico.
 
 ---
 
-# 91. Recurrence Entity
+# 95. APIs Avançadas
 
 ```text
-RecurringAppointment
+POST /prescriptions/{id}/renew
 
-├── id
-├── recurrenceRule
-├── occurrences
-├── endsAt
-└── metadata
+POST /prescriptions/{id}/cancel
+
+POST /prescriptions/{id}/print
+
+POST /prescriptions/{id}/export
+
+POST /prescriptions/templates
+
+GET  /prescription-templates
 ```
 
 ---
 
-# 92. Recurrence Exceptions
-
-Ocorrências individuais poderão ser alteradas sem modificar toda a série.
-
----
-
-# 93. Series
-
-Cada recorrência representará uma série de agendamentos relacionados.
-
----
-
-# 94. Cancellation Scope
-
-Exemplos:
-
-```text
-Only This Appointment
-
-This And Future
-
-Entire Series
-```
-
----
-
-# 95. Domain Events
+# 96. Domain Events
 
 Eventos adicionais:
 
 ```text
-appointment.locked
+prescription.template.created
 
-appointment.unlocked
+prescription.printed
 
-appointment.checkin
+prescription.exported
 
-appointment.waiting
-
-appointment.started
-
-appointment.queue.updated
+prescription.override.created
 ```
 
 ---
 
-# 96. Observability
+# 97. Observability
 
 Métricas adicionais:
 
 ```text
-Appointments Per Day
+Interaction Alerts
 
-No Show Rate
+Overrides
+
+Templates Used
+
+Renewals
 
 Cancellation Rate
-
-Average Waiting Time
-
-Check-in Rate
 ```
 
 ---
 
-# 97. Domain Invariants
+# 98. Domain Invariants
 
 ```text
-Every Appointment belongs to one Calendar.
+Every Signed Prescription preserves history.
 
-Only one confirmed booking exists per time slot by default.
+Renewals create new Prescriptions.
 
-Room reservations respect availability.
+Controlled Medications may require additional validation.
 
-Recurring appointments preserve relationships.
+Templates never replace issued Prescriptions.
 
-Waiting lists never bypass booking rules.
+Clinical alerts support decisions without replacing professionals.
 
-Time slots are generated from availability rules.
+Interaction overrides require justification.
 ```
 
 ---
 
-# 98. Decisões Arquiteturais e de Produto
+# 99. Decisões Arquiteturais e de Produto
 
-## ADR-1091
+## ADR-1031
 
-Calendários suportarão múltiplos contextos operacionais.
-
----
-
-## ADR-1092
-
-Disponibilidade será derivada das regras da agenda.
+Prescrições assinadas serão imutáveis.
 
 ---
 
-## ADR-1093
+## ADR-1032
 
-Conflitos serão detectados antes da confirmação.
-
----
-
-## ADR-1094
-
-Telemedicina será tratada como contexto do Appointment.
+Renovações criarão novas entidades.
 
 ---
 
-## ADR-1095
+## ADR-1033
 
-Check-in permanecerá separado do Encounter.
-
----
-
-## ADR-1096
-
-Recorrências serão modeladas como séries independentes.
+Interações medicamentosas serão tratadas como apoio à decisão.
 
 ---
 
-## ADR-1097
+## ADR-1034
 
-Waiting Lists poderão promover pacientes automaticamente.
-
----
-
-## ADR-1098
-
-Locks temporários impedirão reservas simultâneas.
+Overrides exigirão justificativa obrigatória.
 
 ---
 
-## ADR-1099
+## ADR-1035
 
-Recursos físicos poderão ser reservados junto ao agendamento.
-
----
-
-## ADR-1100
-
-Scheduling permanecerá exclusivamente responsável pelo gerenciamento de agendas.
+Templates permanecerão separados das prescrições emitidas.
 
 ---
 
-# 99. Continuação
+## ADR-1036
+
+O domínio suportará medicamentos controlados sem acoplamento às legislações específicas.
+
+---
+
+## ADR-1037
+
+A arquitetura permitirá integração com motores externos de decisão clínica.
+
+---
+
+## ADR-1038
+
+Exportações utilizarão formatos padronizados quando possível.
+
+---
+
+## ADR-1039
+
+Medical Records continuará sendo responsável pela Timeline Clínica.
+
+---
+
+## ADR-1040
+
+Prescriptions permanecerá como Source of Truth para ordens terapêuticas.
+
+---
+
+# 100. Continuação
 
 Na Parte 3 serão abordados:
 
-- Segurança
 - LGPD
+- Segurança
+- Auditoria avançada
 - Multi-tenant
 - Multi-clinic
-- Auditoria avançada
+- Compartilhamento
 - APIs públicas
 - Integrações
 - Escalabilidade
-- ADR-1101 em diante
+- ADR-1041 em diante
 ---
 
-# 100. Segurança
+# 101. Segurança
 
-O módulo Scheduling manipula informações relacionadas à agenda dos profissionais e dos pacientes.
+O módulo Prescriptions manipula decisões terapêuticas oficiais.
 
-Esses dados deverão ser protegidos durante todo o seu ciclo de vida.
+Seu conteúdo deverá ser protegido durante todo o ciclo de vida da prescrição.
 
 ---
 
-# 101. Princípios
+# 102. Princípios
 
 Toda implementação deverá seguir:
 
@@ -1279,40 +1257,42 @@ Need to Know
 
 ---
 
-# 102. Dados Sensíveis
+# 103. Dados Sensíveis
 
 Exemplos:
 
 ```text
-Nome do paciente
+Medicamentos
 
-Horário do atendimento
+Dosagens
 
-Profissional
+Posologia
 
-Clínica
+Instruções
 
-Tipo de atendimento
+Profissional Responsável
 
-Sala
+Assinatura Clínica
 ```
 
 ---
 
-# 103. LGPD
+# 104. LGPD
 
-O módulo deverá respeitar integralmente a Lei Geral de Proteção de Dados (LGPD).
-
-A agenda somente poderá ser acessada por usuários autorizados.
+O tratamento das prescrições deverá respeitar a LGPD e demais regulamentações aplicáveis.
 
 ---
 
-# 104. Controle de Acesso
+# 105. Controle de Acesso
 
-Toda operação deverá validar:
+A autorização deverá considerar:
 
 ```text
 Organization
+
+↓
+
+Professional
 
 ↓
 
@@ -1320,44 +1300,42 @@ Role
 
 ↓
 
-Permission
+Patient Relationship
 
 ↓
 
-Clinic Scope
+Permission
 ```
 
 ---
 
-# 105. Least Privilege
+# 106. Least Privilege
 
-Cada usuário visualizará apenas as agendas necessárias para executar suas atividades.
-
----
-
-# 106. Multi-Tenant
-
-Toda agenda pertence exatamente a uma Organization.
+Cada usuário visualizará apenas as informações necessárias para exercer sua função.
 
 ---
 
-# 107. Tenant Isolation
+# 107. Multi-Tenant
 
-Nenhum usuário poderá visualizar ou modificar agendas de outra organização.
+Toda Prescription pertence a exatamente uma Organization.
 
 ---
 
-# 108. Multi-Clinic
+# 108. Tenant Isolation
+
+Nenhuma consulta poderá acessar prescrições de outra organização.
+
+---
+
+# 109. Multi-Clinic
 
 Uma organização poderá possuir diversas clínicas.
 
-Cada Appointment deverá estar associado ao contexto correto.
+A clínica representa o contexto operacional da prescrição.
 
 ---
 
-# 109. Clinic Scope
-
-Fluxo:
+# 110. Clinic Context
 
 ```text
 Organization
@@ -1368,67 +1346,56 @@ Clinic
 
 ↓
 
-Schedule
+Encounter
 
 ↓
 
-Appointment
+Prescription
 ```
 
 ---
 
-# 110. Compartilhamento
+# 111. Compartilhamento
 
-Profissionais poderão compartilhar agendas quando permitido pela organização.
-
----
-
-# 111. Delegação
-
-Um profissional poderá autorizar outro usuário a gerenciar sua agenda.
+O compartilhamento de prescrições deverá seguir políticas definidas pela organização.
 
 ---
 
-# 112. Delegate Entity
+# 112. Exportação
 
-```text
-ScheduleDelegate
-
-├── id
-├── scheduleId
-├── delegatedTo
-├── permissions
-├── validUntil
-└── metadata
-```
+Exportações deverão ser autorizadas e auditadas.
 
 ---
 
-# 113. Permissões Delegadas
+# 113. Export Formats
 
 Exemplos:
 
 ```text
-View Only
+PDF
 
-Create
+FHIR
 
-Edit
+HL7
 
-Cancel
-
-Full Access
+Structured JSON
 ```
 
 ---
 
-# 114. Auditoria
+# 114. Impressão
 
-Toda alteração relevante deverá produzir auditoria.
+Impressões deverão ser registradas para fins de auditoria.
 
 ---
 
-# 115. Audit Trail
+# 115. Read Audit
+
+Quando exigido, visualizações também poderão gerar eventos de auditoria.
+
+---
+
+# 116. Audit Trail
 
 Registrar:
 
@@ -1439,133 +1406,145 @@ Timestamp
 
 Action
 
-Appointment
+Prescription
 
-Before
-
-After
+Organization
 
 Reason
+
+Source
 ```
 
 ---
 
-# 116. Audit Actions
+# 117. Audit Entity
+
+```text
+PrescriptionAuditEvent
+
+├── id
+├── organizationId
+├── prescriptionId
+├── actorId
+├── action
+├── occurredAt
+├── metadata
+```
+
+---
+
+# 118. Audit Actions
 
 Exemplos:
 
 ```text
-Appointment Created
+Viewed
+
+Created
+
+Updated
+
+Signed
+
+Printed
+
+Exported
 
 Cancelled
 
-Rescheduled
-
-Confirmed
-
-Check-in
-
-Completed
-
-No Show
+Renewed
 ```
 
 ---
 
-# 117. Read Audit
+# 119. Imutabilidade
 
-Quando exigido pela organização, visualizações também poderão ser auditadas.
-
----
-
-# 118. Exportação
-
-Exportações de agendas deverão respeitar permissões administrativas.
+Após assinatura, a prescrição deverá permanecer imutável.
 
 ---
 
-# 119. APIs Públicas
+# 120. Correções
+
+Correções deverão gerar:
+
+```text
+Amendment
+
+↓
+
+Audit
+
+↓
+
+New Version
+```
+
+---
+
+# 121. Versionamento
+
+Toda alteração relevante deverá preservar versões anteriores.
+
+---
+
+# 122. Provenance
+
+Toda informação deverá registrar:
+
+```text
+Who
+
+When
+
+Where
+
+Why
+```
+
+---
+
+# 123. APIs Públicas
 
 Contratos deverão permanecer estáveis.
 
 ---
 
-# 120. API Versioning
+# 124. API Versioning
 
 Mudanças incompatíveis deverão gerar novas versões.
 
 ---
 
-# 121. External Integrations
+# 125. External Integrations
 
-Scheduling poderá integrar:
+O domínio poderá integrar:
 
 ```text
-Google Calendar
+Government Systems
 
-Microsoft Outlook
+Pharmacies
 
-Apple Calendar
+FHIR Servers
 
-FHIR Scheduling
+Clinical Decision Engines
 
-Telemedicine Providers
+Hospital Systems
 ```
 
 ---
 
-# 122. Calendar Sync
+# 126. Anti-Corruption Layer
 
-Sincronizações deverão ser explícitas.
-
-Nunca implícitas.
+Integrações externas nunca deverão modificar diretamente o Aggregate Prescription.
 
 ---
 
-# 123. Source of Truth
+# 127. Event Bus
 
-Mesmo sincronizando com sistemas externos:
+Fluxo conceitual:
 
 ```text
-Scheduling
-
-↓
-
-Source of Truth
-```
-
----
-
-# 124. Conflict Resolution
-
-Conflitos entre agendas deverão exigir resolução explícita.
-
-Nunca sobrescrever automaticamente um compromisso confirmado.
-
----
-
-# 125. Provenance
-
-Toda sincronização deverá registrar:
-
-```text
-Source
-
-ImportedAt
-
-ImportedBy
-
-SynchronizationId
-```
-
----
-
-# 126. Event Bus
-
-Fluxo:
-
-```text
-Scheduling
+Prescription
 
 ↓
 
@@ -1582,27 +1561,25 @@ Subscribers
 
 ---
 
-# 127. Published Events
+# 128. Published Events
 
 Exemplos:
 
 ```text
-appointment.created
+prescription.created
 
-appointment.updated
+prescription.signed
 
-appointment.cancelled
+prescription.cancelled
 
-appointment.rescheduled
+prescription.renewed
 
-appointment.completed
-
-appointment.no_show
+prescription.exported
 ```
 
 ---
 
-# 128. Event Consumers
+# 129. Event Consumers
 
 Exemplos:
 
@@ -1611,116 +1588,112 @@ Medical Records
 
 Notifications
 
-Billing
-
 Analytics
+
+Audit
 
 AI
 ```
 
 ---
 
-# 129. Idempotência
+# 130. Idempotência
 
-Consumidores deverão suportar processamento duplicado dos eventos.
-
----
-
-# 130. Retry
-
-Eventos poderão ser reenviados automaticamente quando necessário.
+Consumidores deverão suportar processamento duplicado.
 
 ---
 
-# 131. Dead Letter Queue
+# 131. Retry
 
-Eventos não processados deverão ser enviados para análise após número máximo de tentativas.
-
----
-
-# 132. Performance
-
-Consultas deverão responder rapidamente mesmo em agendas extensas.
+Eventos poderão ser reenviados.
 
 ---
 
-# 133. Search
+# 132. Dead Letter Queue
+
+Eventos com falhas persistentes poderão ser encaminhados para análise.
+
+---
+
+# 133. Performance
+
+Consultas frequentes deverão utilizar índices apropriados.
+
+---
+
+# 134. Search
 
 Permitir pesquisa por:
 
 ```text
-Paciente
+Patient
 
-Profissional
+Professional
 
-Data
-
-Clínica
+Medication
 
 Status
 
-Tipo
+Date
+
+Encounter
+
+Clinic
 ```
 
 ---
 
-# 134. Search Projection
+# 135. Search Projection
 
-Pesquisas poderão utilizar índices especializados.
-
----
-
-# 135. Pagination
-
-Grandes consultas deverão utilizar paginação consistente.
+A pesquisa poderá utilizar projeções otimizadas.
 
 ---
 
-# 136. Sorting
+# 136. Pagination
+
+Grandes conjuntos deverão utilizar paginação.
+
+---
+
+# 137. Sorting
 
 Ordenações comuns:
 
 ```text
-Start Time
+IssuedAt
+
+SignedAt
+
+Status
 
 Professional
 
 Patient
-
-CreatedAt
-
-Status
 ```
 
 ---
 
-# 137. Escalabilidade
+# 138. Escalabilidade
 
-O módulo deverá suportar milhões de agendamentos ao longo dos anos.
-
----
-
-# 138. Horizontal Scaling
-
-Consultas e workers poderão escalar horizontalmente.
+O módulo deverá suportar milhões de prescrições ao longo dos anos.
 
 ---
 
-# 139. Cache
+# 139. Horizontal Scaling
 
-Cache poderá acelerar leitura de agendas frequentemente acessadas.
+Workers e consultas poderão escalar horizontalmente.
 
 ---
 
-# 140. Cache Invalidation
+# 140. Cache
 
-Qualquer alteração em Appointment deverá invalidar projeções afetadas.
+Cache poderá acelerar consultas sem comprometer consistência.
 
 ---
 
 # 141. Observabilidade
 
-O módulo deverá produzir:
+O domínio deverá produzir:
 
 ```text
 Logs
@@ -1734,7 +1707,7 @@ Distributed Traces
 
 # 142. Logs
 
-Logs nunca deverão expor informações sensíveis desnecessárias dos pacientes.
+Logs nunca deverão expor conteúdo clínico desnecessário.
 
 ---
 
@@ -1743,24 +1716,22 @@ Logs nunca deverão expor informações sensíveis desnecessárias dos pacientes
 Exemplos:
 
 ```text
-Appointments Created
+Signed Prescriptions
 
-Appointments Completed
+Renewals
 
-Average Waiting Time
+Interaction Alerts
 
-Cancellation Rate
+Exports
 
-No Show Rate
-
-Check-in Rate
+Average Signing Time
 ```
 
 ---
 
 # 144. Dashboards
 
-Administradores poderão acompanhar indicadores operacionais da agenda.
+Administradores poderão acompanhar indicadores operacionais.
 
 ---
 
@@ -1769,22 +1740,20 @@ Administradores poderão acompanhar indicadores operacionais da agenda.
 Exemplos:
 
 ```text
-Agenda sobrecarregada
+Falhas de Assinatura
 
-Grande número de cancelamentos
+Grande volume de Cancelamentos
 
-Alta taxa de No Show
+Falhas de Exportação
 
-Falhas de sincronização
-
-Conflitos recorrentes
+Integrações indisponíveis
 ```
 
 ---
 
 # 146. Disaster Recovery
 
-O módulo deverá possuir plano de recuperação para falhas críticas.
+O domínio deverá suportar recuperação após falhas críticas.
 
 ---
 
@@ -1793,17 +1762,15 @@ O módulo deverá possuir plano de recuperação para falhas críticas.
 Backups deverão preservar:
 
 ```text
-Appointments
+Prescription
 
-Schedules
+Items
 
-Availability
-
-Blocks
+Signature
 
 Audit
 
-Recurrences
+Relationships
 ```
 
 ---
@@ -1814,145 +1781,152 @@ Processos de restauração deverão ser testados periodicamente.
 
 ---
 
-# 149. Resiliência
+# 149. Disponibilidade
 
-Falhas em integrações externas nunca deverão impedir agendamentos locais.
+Prescriptions deverá permanecer disponível independentemente dos módulos consumidores.
 
 ---
 
-# 150. Domain Invariants
+# 150. Resiliência
+
+Falhas em integrações externas nunca deverão impedir a criação local de prescrições.
+
+---
+
+# 151. Domain Invariants
 
 ```text
-Every Appointment belongs to one Organization.
+Every Prescription belongs to one Organization.
 
-Every Appointment belongs to one Professional.
+Every Prescription belongs to one Patient.
 
-Scheduling is the Source of Truth.
+Signed Prescriptions are immutable.
 
-Appointments preserve history.
+Audit is mandatory.
+
+Renewals create new entities.
 
 Tenant Isolation is mandatory.
 
-External integrations never bypass the domain.
+Clinical integrity is preserved.
 
-Availability controls booking consistency.
+External integrations never bypass the domain.
 ```
 
 ---
 
-# 151. Decisões Arquiteturais e de Produto
+# 152. Decisões Arquiteturais e de Produto
 
-## ADR-1101
+## ADR-1041
 
-Scheduling adotará isolamento completo entre organizações.
-
----
-
-## ADR-1102
-
-Sincronizações externas nunca substituirão registros locais silenciosamente.
+Prescriptions adotará imutabilidade após assinatura.
 
 ---
 
-## ADR-1103
+## ADR-1042
+
+Exportações serão obrigatoriamente auditadas.
+
+---
+
+## ADR-1043
+
+Integrações utilizarão APIs estáveis e eventos versionados.
+
+---
+
+## ADR-1044
 
 Toda alteração relevante produzirá auditoria.
 
 ---
 
-## ADR-1104
+## ADR-1045
 
-Integrações utilizarão eventos versionados.
-
----
-
-## ADR-1105
-
-Scheduling permanecerá o Source of Truth das agendas.
+Tenant Isolation será obrigatório.
 
 ---
 
-## ADR-1106
+## ADR-1046
 
-Conflitos de sincronização exigirão resolução explícita.
-
----
-
-## ADR-1107
-
-Exportações serão auditáveis.
+Eventos serão publicados através do Event Bus.
 
 ---
 
-## ADR-1108
+## ADR-1047
 
-Agendas poderão ser delegadas mediante permissões específicas.
-
----
-
-## ADR-1109
-
-Calendários externos serão tratados como integrações, nunca como domínio.
+O domínio permanecerá preparado para integração FHIR.
 
 ---
 
-## ADR-1110
+## ADR-1048
 
-Scheduling permanecerá responsável exclusivamente pela gestão do tempo e disponibilidade.
+Assinaturas serão preservadas durante todo o ciclo de vida da prescrição.
 
 ---
 
-# 152. Continuação
+## ADR-1049
+
+Medical Records continuará sendo responsável pela Timeline Clínica.
+
+---
+
+## ADR-1050
+
+Prescriptions permanecerá responsável exclusivamente pelas ordens terapêuticas.
+
+---
+
+# 153. Continuação
 
 Na Parte 4 serão abordados:
 
 - CQRS
 - Read Models
 - Arquitetura avançada
-- Recursos (salas e equipamentos)
 - KPIs
 - Checklists
 - Testabilidade
-- ADR-1111 até ADR-1120
+- Failure Scenarios
+- Anti-Patterns
+- ADR-1051 até ADR-1060
 ---
 
-# 153. Arquitetura do Domínio
+# 154. Arquitetura do Domínio
 
-O módulo Scheduling deverá permanecer responsável exclusivamente pelo gerenciamento de tempo, disponibilidade e reservas.
+O módulo Prescriptions deverá permanecer focado exclusivamente nas ordens terapêuticas.
 
-Nenhuma informação clínica deverá ser armazenada neste domínio.
-
----
-
-# 154. Aggregate Root
-
-A entidade **Appointment** será o Aggregate Root.
-
-Todas as alterações relevantes deverão ocorrer através dela ou de serviços de domínio apropriados.
+Nenhuma responsabilidade relacionada à administração do medicamento, estoque ou dispensação deverá ser incorporada ao domínio.
 
 ---
 
-# 155. Aggregate Boundary
+# 155. Aggregate Root
 
-O Aggregate deverá garantir consistência entre:
+A entidade **Prescription** será o Aggregate Root.
+
+Todas as alterações deverão ocorrer através dela ou de serviços de domínio apropriados.
+
+---
+
+# 156. Aggregate Boundary
+
+O Aggregate será responsável por garantir consistência entre:
 
 ```text
-Appointment
+Prescription
 
-Availability
+PrescriptionItem
 
-Schedule
+PrescriptionSignature
 
-Calendar
+PrescriptionRenewal
 
-ScheduleBlock
-
-WaitingList
+PrescriptionCancellation
 ```
 
 ---
 
-# 156. Entidades Externas
+# 157. Entidades Externas
 
 O Aggregate não controla diretamente:
 
@@ -1961,465 +1935,402 @@ Patient
 
 Professional
 
-Medical Record
-
 Encounter
 
-Billing
+Medication Catalog
 
-Notifications
+Medical Record
 ```
 
-Esses domínios serão apenas referenciados.
+Essas entidades serão apenas referenciadas.
 
 ---
 
-# 157. CQRS
+# 158. CQRS
 
-A arquitetura deverá permitir adoção futura de CQRS.
+O domínio deverá permitir adoção futura de CQRS.
 
 ---
 
-# 158. Command Side
+# 159. Command Side
 
 Operações de escrita:
 
 ```text
-Create Appointment
+Create Prescription
 
-Confirm Appointment
+Add Medication
 
-Cancel Appointment
+Sign Prescription
 
-Reschedule Appointment
+Renew Prescription
 
-Check-in
+Cancel Prescription
 
-Complete Appointment
+Export Prescription
 ```
 
 ---
 
-# 159. Query Side
+# 160. Query Side
 
 Consultas poderão utilizar projeções independentes.
 
 ---
 
-# 160. Read Models
+# 161. Read Models
 
 Exemplos:
 
 ```text
-Reception Calendar
+Prescription Summary
 
-Professional Agenda
+Professional View
 
-Patient Schedule
+Patient View
 
-Daily Dashboard
+Pharmacy View
 
-Clinic Occupancy
+History View
 ```
 
 ---
 
-# 161. Daily Agenda Projection
+# 162. Timeline Projection
 
-Uma projeção poderá conter:
+O Medical Records poderá consumir projeções específicas para compor a Timeline Clínica.
+
+---
+
+# 163. Search Projection
+
+A pesquisa poderá utilizar índices especializados.
+
+---
+
+# 164. Prescription Summary
+
+Uma projeção resumida poderá conter:
 
 ```text
 Professional
 
-Appointments
+Patient
 
-Available Slots
+Date
 
-Blocked Slots
+Status
 
-Waiting List
+Medication Count
 ```
 
 ---
 
-# 162. Patient Schedule Projection
+# 165. Medication Summary
 
 Outra projeção poderá listar:
 
 ```text
-Upcoming Appointments
+Medication
 
-Past Appointments
+Dosage
 
-Cancelled
+Frequency
 
-No Shows
+Duration
 ```
+
+Sem carregar toda a prescrição.
 
 ---
 
-# 163. Occupancy Projection
-
-Indicadores poderão demonstrar:
-
-```text
-Available Hours
-
-Reserved Hours
-
-Blocked Hours
-
-Occupancy Rate
-```
-
----
-
-# 164. Event Sourcing (Future)
+# 166. Event Sourcing (Future)
 
 O domínio deverá permanecer compatível com futura adoção de Event Sourcing.
 
 ---
 
-# 165. Cache
+# 167. Cache
 
-Cache poderá acelerar consultas frequentes.
+Cache poderá acelerar operações de leitura.
 
 Jamais substituirá o Source of Truth.
 
 ---
 
-# 166. Cache Invalidation
+# 168. Cache Invalidation
 
-Alterações em Appointments deverão invalidar automaticamente as projeções afetadas.
-
----
-
-# 167. Search Optimization
-
-Pesquisas deverão permanecer eficientes mesmo com milhões de registros.
+Mudanças relevantes deverão invalidar projeções afetadas.
 
 ---
 
-# 168. Resource Management
+# 169. Search Optimization
 
-A agenda poderá reservar recursos físicos.
-
----
-
-# 169. Resource Entity
-
-```text
-Resource
-
-├── id
-├── organizationId
-├── type
-├── name
-├── status
-└── metadata
-```
+Consultas deverão permanecer eficientes mesmo com milhões de prescrições.
 
 ---
 
-# 170. Resource Types
-
-Exemplos:
-
-```text
-Room
-
-Equipment
-
-Operating Room
-
-MRI
-
-Ultrasound
-
-Wheelchair
-```
-
----
-
-# 171. Resource Availability
-
-Cada recurso poderá possuir sua própria disponibilidade.
-
----
-
-# 172. Shared Resources
-
-Recursos poderão ser compartilhados entre profissionais.
-
----
-
-# 173. Resource Conflicts
-
-Antes da confirmação deverão ser verificados conflitos de recursos.
-
----
-
-# 174. Booking Policy
-
-A política de reserva poderá considerar:
-
-```text
-Professional
-
-Room
-
-Equipment
-
-Duration
-
-Priority
-```
-
----
-
-# 175. KPIs
+# 170. KPIs
 
 Indicadores possíveis:
 
 ```text
-Appointments per Day
+Prescriptions Created
 
-Occupancy Rate
+Signed Prescriptions
 
-Average Waiting Time
+Renewals
 
 Cancellation Rate
 
-No Show Rate
+Average Medications per Prescription
 ```
 
 ---
 
-# 176. Operational KPIs
+# 171. Clinical KPIs
 
 Exemplos:
 
 ```text
-Average Check-in Time
+Most Prescribed Medications
 
-Average Delay
+Average Prescription Duration
 
-Average Appointment Duration
+Renewal Frequency
 
-Resource Utilization
-
-Calendar Utilization
+Controlled Medication Usage
 ```
 
 ---
 
-# 177. Business KPIs
+# 172. Operational KPIs
 
 Exemplos:
 
 ```text
-Revenue Appointments
+Signing Time
 
-Telemedicine Usage
+Export Time
 
-Peak Hours
+Search Latency
 
-Professional Productivity
+API Response Time
+
+Integration Errors
 ```
 
 ---
 
-# 178. Health Checks
+# 173. Health Checks
 
 O módulo deverá expor indicadores de saúde.
 
 ---
 
-# 179. Dependency Monitoring
+# 174. Dependency Monitoring
 
 Monitorar:
 
 ```text
-Database
+Medication Catalog
 
-Calendar Sync
+Decision Support Engine
 
-Telemedicine Provider
+FHIR Integration
 
 Notification Queue
-
-Event Bus
 ```
 
 ---
 
-# 180. Failure Scenarios
+# 175. Failure Scenarios
 
 Exemplos:
 
 ```text
-Double Booking Attempt
+Falha na assinatura
 
-Calendar Conflict
+Medicamento inexistente
 
-Synchronization Failure
+Falha de exportação
 
-Resource Unavailable
+Integração indisponível
 
-Meeting Creation Failed
+Catálogo offline
 
-Queue Failure
+Erro de validação
 ```
 
 ---
 
-# 181. Recovery
+# 176. Recovery
 
-Falhas deverão permitir recuperação sem perda do histórico do agendamento.
+Falhas deverão permitir recuperação sem perda da prescrição.
 
 ---
 
-# 182. Consistência
+# 177. Consistência
 
-Mesmo após falhas deverão permanecer preservados:
+Mesmo após falhas:
 
 ```text
-Appointment
+Prescription
+
+↓
+
+History
+
+↓
 
 Audit
 
-Availability
+↓
 
-Resource Reservation
-
-History
+Integrity
 ```
+
+deverão permanecer preservados.
 
 ---
 
-# 183. Checklists
+# 178. Bulk Operations
 
-## Criar Agendamento
+O domínio poderá suportar operações em lote quando apropriado.
+
+---
+
+# 179. Batch Validation
+
+Operações em lote deverão validar cada prescrição individualmente.
+
+---
+
+# 180. Checklists
+
+## Criar Prescrição
 
 ```text
 [ ] Paciente válido
 
-[ ] Profissional disponível
+[ ] Encounter válido
 
-[ ] Horário disponível
+[ ] Profissional autorizado
 
-[ ] Recursos disponíveis
+[ ] Itens adicionados
 
 [ ] Auditoria criada
 ```
 
 ---
 
-## Confirmar Agendamento
+## Assinar Prescrição
 
 ```text
-[ ] Horário reservado
+[ ] Todos os itens válidos
 
-[ ] Status atualizado
+[ ] Permissão confirmada
+
+[ ] Validações executadas
+
+[ ] Assinatura registrada
 
 [ ] Evento publicado
+```
+
+---
+
+## Renovar Prescrição
+
+```text
+[ ] Prescrição original localizada
+
+[ ] Nova entidade criada
+
+[ ] Relação preservada
 
 [ ] Auditoria registrada
 ```
 
 ---
 
-## Cancelar Agendamento
+## Cancelar Prescrição
 
 ```text
-[ ] Justificativa registrada
+[ ] Justificativa informada
 
-[ ] Horário liberado
-
-[ ] Waiting List atualizada
+[ ] Status atualizado
 
 [ ] Auditoria criada
-```
-
----
-
-## Reagendar
-
-```text
-[ ] Novo horário disponível
-
-[ ] Histórico preservado
-
-[ ] Relação entre agendamentos registrada
 
 [ ] Evento publicado
 ```
 
 ---
 
-## Check-in
+## Exportação
 
 ```text
-[ ] Paciente identificado
+[ ] Permissão validada
 
-[ ] Horário válido
+[ ] Formato suportado
 
-[ ] Status atualizado
+[ ] Auditoria registrada
 
-[ ] Fila atualizada
+[ ] Arquivo gerado
 ```
 
 ---
 
-# 184. Checklist de Code Review
+# 181. Checklist de Code Review
 
 ```text
-[ ] Sem conflitos de horário
-
-[ ] Aggregate preservado
-
-[ ] Eventos publicados
-
-[ ] Auditoria implementada
-
-[ ] Testes atualizados
-
-[ ] APIs documentadas
+[ ] Sem alteração de prescrição assinada
 
 [ ] Tenant Isolation preservado
 
-[ ] Recursos validados
+[ ] Auditoria implementada
+
+[ ] Eventos publicados
+
+[ ] Integrações desacopladas
+
+[ ] Testes atualizados
+
+[ ] Logs sem dados sensíveis
+
+[ ] APIs documentadas
 ```
 
 ---
 
-# 185. Testabilidade
+# 182. Testabilidade
 
 O domínio deverá possuir alta cobertura de testes automatizados.
 
 ---
 
-# 186. Testes Unitários
+# 183. Testes Unitários
 
 Cobrir:
 
 ```text
-Appointment
+Prescription
 
-Availability
+PrescriptionItem
 
-Calendar
+Renewal
 
-Blocks
+Cancellation
 
-Waiting List
+Signature
 
-Resource Booking
+Validation
 ```
 
 ---
 
-# 187. Testes de Integração
+# 184. Testes de Integração
 
 Validar:
 
@@ -2428,24 +2339,24 @@ Persistence
 
 API
 
-Calendar Sync
-
-Telemedicine
+Events
 
 Audit
 
-Event Bus
+Export
+
+Templates
 ```
 
 ---
 
-# 188. Testes de Concorrência
+# 185. Testes de Concorrência
 
-Validar reservas simultâneas para o mesmo horário e recursos.
+Validar múltiplos profissionais tentando atualizar prescrições simultaneamente.
 
 ---
 
-# 189. Testes de Segurança
+# 186. Testes de Segurança
 
 Verificar:
 
@@ -2454,194 +2365,192 @@ Permissions
 
 Tenant Isolation
 
-Delegation
+Signature Integrity
 
 Audit
 
-Calendar Access
+Exports
 ```
 
 ---
 
-# 190. Testes de Performance
+# 187. Testes de Performance
 
 Avaliar:
 
 ```text
-Agenda diária
+Search
 
-Pesquisa
+Export
 
-Sincronização
+Signing
 
-Grande volume de horários
+Large Prescriptions
 
-Recorrências
+Bulk Operations
 ```
 
 ---
 
-# 191. Anti-Patterns
+# 188. Anti-Patterns
 
 Evitar:
 
 ```text
-Misturar agenda com prontuário.
+Alterar prescrições assinadas.
 
-Permitir Double Booking sem política explícita.
+Misturar estoque com prescrição.
 
-Modificar histórico de agendamentos.
+Duplicar catálogo de medicamentos.
 
-Acoplar o domínio ao Google Calendar.
+Excluir prescrições.
 
-Persistir disponibilidade manualmente quando pode ser derivada.
+Misturar administração de medicamentos com ordens terapêuticas.
 
-Ignorar conflitos de recursos.
+Acoplar o domínio ao provedor de assinatura digital.
 ```
 
 ---
 
-# 192. Future Evolution
+# 189. Future Evolution
 
 Possíveis evoluções:
 
 ```text
-AI Scheduling
+Electronic Prescription Networks
 
-Automatic Optimization
+National Prescription Registry
 
-Smart Waiting List
+FHIR MedicationRequest
 
-Predictive No Show
+Clinical Decision AI
 
-Resource Optimization
+Digital Certificate Integration
 
-Multi Timezone Scheduling
+International Standards
 ```
 
 ---
 
-# 193. Domain Invariants
+# 190. Domain Invariants
 
 ```text
-Appointments preserve history.
+Every Prescription has one Aggregate Root.
 
-Availability generates Time Slots.
+Signed Prescriptions are immutable.
 
-Resources cannot be double-booked.
+Renewals preserve history.
 
-Schedules remain the Source of Truth.
+Cancellation preserves history.
 
-Read Models never modify domain state.
+Clinical validation precedes signature.
 
-Bookings respect organization policies.
+External integrations never modify aggregates directly.
 
-Every Appointment belongs to exactly one Schedule.
+Prescription history is permanent.
 ```
 
 ---
 
-# 194. Decisões Arquiteturais e de Produto
+# 191. Decisões Arquiteturais e de Produto
 
-## ADR-1111
+## ADR-1051
 
-Appointment continuará sendo o Aggregate Root.
-
----
-
-## ADR-1112
-
-Disponibilidade será derivada das regras da agenda.
+Prescription continuará sendo o Aggregate Root do domínio.
 
 ---
 
-## ADR-1113
+## ADR-1052
 
-Recursos físicos possuirão gerenciamento independente.
-
----
-
-## ADR-1114
-
-CQRS poderá ser adotado futuramente.
+CQRS poderá ser adotado futuramente sem remodelar o domínio.
 
 ---
 
-## ADR-1115
+## ADR-1053
 
-Read Models especializados serão permitidos.
-
----
-
-## ADR-1116
-
-Toda alteração relevante produzirá eventos.
+Read Models especializados poderão coexistir com o Aggregate.
 
 ---
 
-## ADR-1117
+## ADR-1054
 
-Double Booking será bloqueado por padrão.
-
----
-
-## ADR-1118
-
-Integrações externas permanecerão desacopladas.
+Toda assinatura produzirá evento de domínio.
 
 ---
 
-## ADR-1119
+## ADR-1055
 
-Recursos compartilharão regras consistentes de disponibilidade.
-
----
-
-## ADR-1120
-
-Scheduling continuará exclusivamente responsável pelo gerenciamento temporal da plataforma.
+Catálogo de medicamentos permanecerá desacoplado.
 
 ---
 
-# 195. Continuação
+## ADR-1056
+
+Assinaturas digitais serão abstraídas por interfaces.
+
+---
+
+## ADR-1057
+
+Toda exportação será auditável.
+
+---
+
+## ADR-1058
+
+O domínio suportará integração futura com FHIR MedicationRequest.
+
+---
+
+## ADR-1059
+
+Nenhuma prescrição assinada poderá ser modificada diretamente.
+
+---
+
+## ADR-1060
+
+Prescriptions continuará sendo exclusivamente responsável pelas ordens terapêuticas.
+
+---
+
+# 192. Continuação
 
 Na Parte 5 serão abordados:
 
 - Observabilidade avançada
-- Arquitetura Hexagonal
-- Ports & Adapters
+- LGPD detalhada
 - Disaster Recovery
 - Backup
 - Resiliência
-- APIs avançadas
-- ADR-1121 até ADR-1130
+- Arquitetura distribuída
+- Anti-Corruption Layer
+- ADR-1061 até ADR-1070
 ---
 
-# 196. Observabilidade
+# 193. Observabilidade
 
-O módulo Scheduling deverá fornecer informações suficientes para monitoramento operacional da agenda sem comprometer dados sensíveis.
+O módulo Prescriptions deverá disponibilizar informações suficientes para monitoramento operacional e análise clínica, sem expor dados sensíveis desnecessários.
 
 ---
 
-# 197. Logs
+# 194. Logs
 
-Os logs deverão registrar apenas informações técnicas necessárias.
+Os logs deverão registrar apenas informações técnicas relevantes.
 
-Nunca registrar:
+Nunca armazenar:
 
 ```text
-Dados clínicos
+Prescrição completa
 
-Notas médicas
+Dados pessoais completos
 
-Conteúdo de prontuário
-
-Informações desnecessárias do paciente
+Conteúdo clínico desnecessário
 ```
 
 ---
 
-# 198. Structured Logging
+# 195. Structured Logging
 
 Sempre que possível utilizar logs estruturados.
 
@@ -2654,244 +2563,216 @@ Level
 
 OrganizationId
 
-AppointmentId
+PrescriptionId
 
 ProfessionalId
 
-PatientId
+Event
 
 CorrelationId
-
-Event
 ```
 
 ---
 
-# 199. Correlation ID
+# 196. Correlation ID
 
-Toda operação distribuída deverá possuir um Correlation ID único.
-
-Isso permitirá rastreamento completo entre Scheduling e os demais módulos.
+Toda operação distribuída deverá possuir um Correlation ID para rastreamento ponta a ponta.
 
 ---
 
-# 200. Distributed Tracing
+# 197. Distributed Tracing
 
-Fluxos distribuídos deverão ser rastreados ponta a ponta.
-
-Exemplo:
-
-```text
-Scheduling
-
-↓
-
-Notifications
-
-↓
-
-Medical Records
-
-↓
-
-Analytics
-```
+Integrações entre módulos deverão permitir rastreamento completo do fluxo da prescrição.
 
 ---
 
-# 201. Métricas
+# 198. Métricas
 
 Exemplos:
 
 ```text
-Appointments Created
+Prescriptions Created
 
-Appointments Completed
+Signed Prescriptions
 
-Appointments Cancelled
+Renewals
 
-Appointments Rescheduled
+Cancelled Prescriptions
 
-Check-ins
+Average Signing Time
 
-No Shows
+Export Requests
 ```
 
 ---
 
-# 202. Dashboards
+# 199. Dashboards
 
 Administradores poderão visualizar:
 
 ```text
-Agenda diária
+Prescrições emitidas
 
-Taxa de ocupação
+Renovações
 
 Cancelamentos
 
-No Shows
+Exportações
 
-Teleconsultas
+Alertas clínicos
 
-Fila de espera
+Falhas de integração
 ```
 
 ---
 
-# 203. Alertas
+# 200. Alertas Operacionais
 
 Exemplos:
 
 ```text
-Agenda acima da capacidade
+Taxa elevada de falhas
 
-Grande volume de cancelamentos
+Exportações incomuns
 
-Fila excessiva
+Tempo elevado para assinatura
 
-Sincronização interrompida
+Integrações indisponíveis
 
-Recursos indisponíveis
+Catálogo inacessível
 ```
 
 ---
 
-# 204. Health Checks
+# 201. Health Checks
 
 O módulo deverá expor indicadores de saúde.
 
 ---
 
-# 205. Dependency Monitoring
+# 202. Dependencies
 
 Monitorar:
 
 ```text
 Database
 
-Event Bus
+Medication Catalog
 
-Calendar Providers
+Decision Support
 
-Notification Service
+Notification Queue
 
-Telemedicine Provider
+Signature Provider
 ```
 
 ---
 
-# 206. Resiliência
+# 203. Resiliência
 
-Falhas externas não deverão impedir o gerenciamento local da agenda.
-
----
-
-# 207. Retry
-
-Integrações externas poderão utilizar política controlada de Retry.
+Falhas externas nunca deverão impedir o registro da prescrição em modo local quando possível.
 
 ---
 
-# 208. Circuit Breaker
+# 204. Retry
 
-Falhas recorrentes em provedores externos poderão ativar Circuit Breaker.
+Integrações externas poderão utilizar política de retry controlada.
 
 ---
 
-# 209. Timeout
+# 205. Circuit Breaker
+
+Integrações repetidamente indisponíveis poderão utilizar Circuit Breaker.
+
+---
+
+# 206. Timeout
 
 Toda integração externa deverá possuir timeout configurável.
 
 ---
 
-# 210. Fallback
+# 207. Fallback
 
 Sempre que possível deverá existir estratégia de degradação controlada.
 
 ---
 
-# 211. Disaster Recovery
+# 208. Disaster Recovery
 
 O módulo deverá possuir plano de recuperação para falhas críticas.
 
 ---
 
-# 212. Backup
+# 209. Backup
 
 Backups deverão preservar:
 
 ```text
-Appointments
+Prescription
 
-Schedules
+Items
 
-Calendars
-
-Availability
-
-Blocks
-
-Waiting Lists
+Signature
 
 Audit
-```
-
----
-
-# 213. Restore
-
-Processos de restauração deverão ser testados periodicamente.
-
----
-
-# 214. Data Integrity
-
-Após restauração deverão permanecer preservados:
-
-```text
-Appointment History
 
 Relationships
 
-Audit Trail
-
-Recurrences
+Versions
 ```
 
 ---
 
-# 215. Long-Term Storage
+# 210. Restore
 
-Histórico de agendamentos poderá ser mantido por longos períodos conforme políticas organizacionais e legislação aplicável.
-
----
-
-# 216. Retention Policy
-
-A política de retenção deverá ser configurável.
+Processos de restauração deverão ser periodicamente testados.
 
 ---
 
-# 217. Arquivamento
+# 211. Data Integrity
 
-Arquivamento nunca representa exclusão.
-
----
-
-# 218. Exclusão
-
-Exclusão física somente deverá ocorrer quando permitida por políticas específicas.
+Após restauração, nenhuma prescrição deverá perder sua integridade referencial.
 
 ---
 
-# 219. Arquitetura Hexagonal
+# 212. Long-Term Storage
 
-O domínio deverá seguir os princípios de Ports & Adapters.
+Prescrições poderão permanecer armazenadas durante longos períodos conforme legislação aplicável.
 
 ---
 
-# 220. Ports
+# 213. Retention Policy
+
+As políticas de retenção deverão ser configuráveis.
+
+---
+
+# 214. Arquivamento
+
+Arquivamento não representa exclusão.
+
+---
+
+# 215. Exclusão
+
+A exclusão física deverá ocorrer apenas quando permitida por exigências legais e políticas específicas.
+
+---
+
+# 216. Anti-Corruption Layer
+
+Integrações externas nunca deverão conhecer detalhes internos do Aggregate.
+
+---
+
+# 217. Adapters
+
+Toda integração deverá ocorrer através de adaptadores.
+
+---
+
+# 218. Ports
 
 O domínio dependerá apenas de interfaces.
 
@@ -2899,42 +2780,78 @@ Nunca de implementações concretas.
 
 ---
 
-# 221. Adapters
+# 219. Hexagonal Architecture
 
-Integrações externas deverão ser implementadas através de adaptadores.
-
----
-
-# 222. External Providers
-
-Exemplos:
+Fluxo conceitual:
 
 ```text
-Google Calendar
+Application
 
-Microsoft Outlook
+↓
 
-Zoom
+Ports
 
-Google Meet
+↓
 
-Teams
+Domain
+
+↓
+
+Ports
+
+↓
+
+Infrastructure
 ```
 
 ---
 
-# 223. Dependency Rule
+# 220. Dependency Rule
 
-O domínio nunca dependerá diretamente da infraestrutura.
+O domínio nunca dependerá da infraestrutura.
 
 ---
 
-# 224. Repository
+# 221. External Providers
+
+Exemplos:
+
+```text
+Digital Signature
+
+FHIR
+
+Medication Catalog
+
+Clinical Rules Engine
+```
+
+---
+
+# 222. Domain Services
+
+Regras complexas poderão ser encapsuladas em Domain Services.
+
+---
+
+# 223. Application Services
+
+Coordenação de casos de uso deverá permanecer fora do Aggregate.
+
+---
+
+# 224. Infrastructure
+
+Persistência, filas e integrações pertencem à camada de infraestrutura.
+
+---
+
+# 225. Repository
 
 Exemplo conceitual:
 
 ```text
-AppointmentRepository
+PrescriptionRepository
 
 ↓
 
@@ -2942,164 +2859,162 @@ Find
 
 Save
 
-Search
-
 Update
+
+Search
 ```
 
 ---
 
-# 225. Domain Services
-
-Regras compartilhadas poderão ser encapsuladas em Domain Services.
-
----
-
-# 226. Application Services
-
-Casos de uso deverão ser coordenados por Application Services.
-
----
-
-# 227. Value Objects
-
-Exemplos:
-
-```text
-TimeRange
-
-AppointmentDuration
-
-Timezone
-
-Slot
-
-BusinessHours
-```
-
----
-
-# 228. Imutabilidade
-
-Value Objects deverão ser imutáveis.
-
----
-
-# 229. Factory
-
-Factories poderão simplificar criação de agendas complexas.
-
----
-
-# 230. Specification Pattern
+# 226. Specification Pattern
 
 Consultas complexas poderão utilizar Specifications.
 
 ---
 
-# 231. APIs Internas
+# 227. Factory
 
-APIs internas deverão permanecer estáveis.
+Factories poderão simplificar criação de prescrições complexas.
 
 ---
 
-# 232. APIs Públicas
+# 228. Value Objects
+
+Exemplos:
+
+```text
+Dosage
+
+Frequency
+
+Duration
+
+Route
+
+Quantity
+```
+
+---
+
+# 229. Imutabilidade
+
+Value Objects deverão ser imutáveis.
+
+---
+
+# 230. Rich Domain Model
+
+As regras deverão permanecer no domínio.
+
+Nunca espalhadas pela camada de infraestrutura.
+
+---
+
+# 231. APIs Internas
+
+APIs internas deverão preservar contratos estáveis.
+
+---
+
+# 232. APIs Externas
 
 Integrações públicas deverão possuir versionamento.
 
 ---
 
-# 233. Compatibilidade
+# 233. Versionamento
 
-Sempre preservar backward compatibility quando possível.
+Mudanças incompatíveis deverão gerar nova versão.
 
 ---
 
-# 234. Versionamento
+# 234. Compatibilidade
 
-Mudanças incompatíveis deverão gerar nova versão.
+Sempre preservar backward compatibility quando possível.
 
 ---
 
 # 235. Domain Invariants
 
 ```text
+Aggregate controls consistency.
+
+Value Objects are immutable.
+
 Repositories abstract persistence.
 
 Ports isolate infrastructure.
 
-Adapters integrate external systems.
-
-Value Objects are immutable.
+Integrations never bypass the domain.
 
 Audit is preserved.
 
-Scheduling remains technology independent.
+History is immutable.
 
-Availability remains deterministic.
+Clinical integrity is maintained.
 ```
 
 ---
 
 # 236. Decisões Arquiteturais e de Produto
 
-## ADR-1121
+## ADR-1061
 
-Observabilidade será requisito obrigatório.
-
----
-
-## ADR-1122
-
-Scheduling seguirá Arquitetura Hexagonal.
+Observabilidade será requisito arquitetural.
 
 ---
 
-## ADR-1123
+## ADR-1062
+
+O domínio seguirá os princípios da Arquitetura Hexagonal.
+
+---
+
+## ADR-1063
 
 Integrações utilizarão Ports & Adapters.
 
 ---
 
-## ADR-1124
+## ADR-1064
 
-Value Objects permanecerão imutáveis.
-
----
-
-## ADR-1125
-
-Factories poderão encapsular criação de agendas.
+Value Objects serão imutáveis.
 
 ---
 
-## ADR-1126
+## ADR-1065
+
+Factories poderão encapsular criação complexa.
+
+---
+
+## ADR-1066
 
 Repositories abstrairão persistência.
 
 ---
 
-## ADR-1127
+## ADR-1067
 
 Application Services coordenarão casos de uso.
 
 ---
 
-## ADR-1128
+## ADR-1068
 
-Domain Services centralizarão regras compartilhadas.
+Domain Services concentrarão regras compartilhadas.
 
 ---
 
-## ADR-1129
+## ADR-1069
 
 Toda integração permanecerá desacoplada do domínio.
 
 ---
 
-## ADR-1130
+## ADR-1070
 
-Scheduling permanecerá independente da tecnologia utilizada para persistência.
+Prescriptions permanecerá independente da tecnologia de persistência.
 
 ---
 
@@ -3114,14 +3029,14 @@ Na Parte 6 serão abordados:
 - Checklists
 - Definition of Done
 - Failure Scenarios
-- ADR-1131 até ADR-1140
+- ADR-1071 até ADR-1080
 ---
 
 # 238. Arquitetura Orientada a Eventos
 
-O módulo Scheduling deverá publicar eventos de domínio para informar mudanças relevantes no ciclo de vida dos agendamentos.
+O módulo Prescriptions deverá publicar eventos de domínio para informar mudanças relevantes aos demais módulos da plataforma.
 
-Esses eventos representam alterações administrativas, nunca informações clínicas.
+Esses eventos representam alterações no ciclo de vida da prescrição.
 
 ---
 
@@ -3130,7 +3045,7 @@ Esses eventos representam alterações administrativas, nunca informações clí
 Fluxo conceitual:
 
 ```text
-Scheduling
+Prescriptions
 
 ↓
 
@@ -3152,21 +3067,19 @@ Subscribers
 Exemplos:
 
 ```text
-appointment.created
+prescription.created
 
-appointment.confirmed
+prescription.updated
 
-appointment.checked_in
+prescription.signed
 
-appointment.completed
+prescription.cancelled
 
-appointment.cancelled
+prescription.renewed
 
-appointment.rescheduled
+prescription.exported
 
-appointment.no_show
-
-appointment.waiting_list.promoted
+prescription.printed
 ```
 
 ---
@@ -3180,9 +3093,9 @@ Medical Records
 
 Notifications
 
-Billing
-
 Analytics
+
+Audit
 
 AI
 
@@ -3193,13 +3106,13 @@ Reporting
 
 # 242. Responsabilidade
 
-Scheduling informa:
+Prescriptions informa:
 
 ```text
-Um evento relacionado à agenda ocorreu.
+Uma decisão terapêutica ocorreu.
 ```
 
-Os módulos consumidores decidem como reagir.
+Os consumidores decidem como reagir.
 
 ---
 
@@ -3216,30 +3129,22 @@ OccurredAt
 
 OrganizationId
 
-AppointmentId
+PrescriptionId
 ```
 
 ---
 
 # 244. Event Payload
 
-Os eventos deverão conter apenas os dados necessários.
+Payloads deverão conter apenas informações necessárias.
 
-Sempre que possível utilizar apenas referências como:
-
-```text
-AppointmentId
-
-PatientId
-
-ProfessionalId
-```
+Nunca transmitir toda a prescrição quando apenas o identificador for suficiente.
 
 ---
 
 # 245. Idempotência
 
-Consumidores deverão suportar processamento duplicado.
+Consumidores deverão suportar reprocessamento do mesmo evento.
 
 ---
 
@@ -3251,7 +3156,7 @@ Eventos poderão ser reenviados automaticamente quando necessário.
 
 # 247. Dead Letter Queue
 
-Eventos que excederem o número máximo de tentativas deverão ser enviados para análise.
+Eventos não processados após múltiplas tentativas deverão ser encaminhados para análise.
 
 ---
 
@@ -3266,19 +3171,17 @@ O domínio deverá permanecer preparado para adoção futura de CQRS.
 Operações de escrita:
 
 ```text
-Create Appointment
+Create Prescription
 
-Confirm Appointment
+Sign Prescription
 
-Cancel Appointment
+Renew Prescription
 
-Reschedule Appointment
+Cancel Prescription
 
-Check-in
+Add Item
 
-Complete Appointment
-
-Block Schedule
+Remove Item
 ```
 
 ---
@@ -3294,56 +3197,34 @@ Consultas poderão utilizar modelos especializados.
 Exemplos:
 
 ```text
-Reception Dashboard
+Prescription Summary
 
-Professional Calendar
+Patient View
 
-Patient Portal
+Professional View
 
-Waiting List
+Medication View
 
-Room Schedule
+History View
 ```
 
 ---
 
-# 252. Occupancy Projection
+# 252. Dashboard Projection
 
-Uma projeção poderá apresentar:
-
-```text
-Occupied Slots
-
-Available Slots
-
-Blocked Slots
-
-Occupancy Percentage
-```
+Painéis administrativos poderão utilizar projeções independentes.
 
 ---
 
-# 253. Daily Schedule Projection
+# 253. Timeline Projection
 
-Outra projeção poderá conter:
-
-```text
-Morning
-
-Afternoon
-
-Evening
-
-Appointments
-
-Free Slots
-```
+Medical Records poderá consumir projeções resumidas da prescrição.
 
 ---
 
 # 254. Search Projection
 
-Pesquisas poderão utilizar índices especializados.
+A pesquisa textual poderá utilizar índices dedicados.
 
 ---
 
@@ -3357,7 +3238,7 @@ Jamais substituir o Source of Truth.
 
 # 256. Cache Invalidation
 
-Mudanças em agendamentos deverão invalidar automaticamente as projeções afetadas.
+Atualizações relevantes deverão invalidar caches relacionados.
 
 ---
 
@@ -3366,60 +3247,56 @@ Mudanças em agendamentos deverão invalidar automaticamente as projeções afet
 Indicadores sugeridos:
 
 ```text
-Appointments per Day
+Prescriptions per Day
 
-Occupancy Rate
-
-Average Waiting Time
-
-No Show Rate
+Renewal Rate
 
 Cancellation Rate
 
-Reschedule Rate
+Average Signing Time
+
+Average Medications per Prescription
 ```
 
 ---
 
-# 258. Operational Metrics
+# 258. Clinical Metrics
 
 Exemplos:
 
 ```text
-Check-in Duration
+Most Prescribed Medications
 
-Queue Time
+Average Treatment Duration
 
-Calendar Latency
+Controlled Medication Usage
 
-Synchronization Time
+Interaction Alerts
+```
 
+---
+
+# 259. Operational Metrics
+
+Exemplos:
+
+```text
 API Latency
-```
 
----
+Database Latency
 
-# 259. Business Metrics
+Export Duration
 
-Exemplos:
+Signature Duration
 
-```text
-Professional Productivity
-
-Clinic Utilization
-
-Telemedicine Adoption
-
-Peak Hours
-
-Resource Usage
+Integration Errors
 ```
 
 ---
 
 # 260. Health Checks
 
-O módulo deverá disponibilizar endpoints de saúde.
+O módulo deverá disponibilizar endpoints de saúde para monitoramento.
 
 ---
 
@@ -3432,11 +3309,11 @@ Database
 
 Event Bus
 
-Calendar Providers
+Signature Provider
 
-Telemedicine Providers
+Medication Catalog
 
-Notification Queue
+Clinical Rules Engine
 ```
 
 ---
@@ -3446,24 +3323,24 @@ Notification Queue
 Exemplos:
 
 ```text
-Double Booking Attempt
+Falha na assinatura
 
-Calendar Sync Failure
+Falha de exportação
 
-Waiting List Failure
+Evento não publicado
 
-Resource Conflict
+Fila indisponível
 
-Meeting Creation Failure
+Integração interrompida
 
-Schedule Lock Failure
+Erro de catálogo
 ```
 
 ---
 
 # 263. Recovery
 
-Falhas deverão permitir recuperação sem perda do histórico do agendamento.
+Falhas deverão permitir recuperação sem perda de integridade da prescrição.
 
 ---
 
@@ -3472,31 +3349,31 @@ Falhas deverão permitir recuperação sem perda do histórico do agendamento.
 Mesmo após falhas deverão permanecer preservados:
 
 ```text
-Appointment
+Prescription
 
-Availability
+Items
 
 Audit
 
-History
+Signature
 
-Waiting List
+History
 ```
 
 ---
 
 # 265. Checklists
 
-## Criar Agendamento
+## Criar Prescrição
 
 ```text
 [ ] Paciente válido
 
-[ ] Profissional disponível
+[ ] Encounter válido
 
-[ ] Horário disponível
+[ ] Profissional autorizado
 
-[ ] Recursos disponíveis
+[ ] Itens válidos
 
 [ ] Auditoria criada
 
@@ -3505,58 +3382,58 @@ Waiting List
 
 ---
 
-## Confirmar Agendamento
+## Assinar Prescrição
 
 ```text
-[ ] Horário reservado
+[ ] Todas as validações executadas
 
-[ ] Status atualizado
+[ ] Assinatura registrada
 
-[ ] Auditoria registrada
+[ ] Auditoria criada
 
 [ ] Evento publicado
 ```
 
 ---
 
-## Cancelar Agendamento
+## Renovação
+
+```text
+[ ] Prescrição original localizada
+
+[ ] Nova entidade criada
+
+[ ] Relação preservada
+
+[ ] Histórico preservado
+```
+
+---
+
+## Cancelamento
 
 ```text
 [ ] Justificativa registrada
 
-[ ] Horário liberado
-
-[ ] Waiting List atualizada
-
 [ ] Auditoria criada
-```
 
----
-
-## Reagendar
-
-```text
-[ ] Novo horário disponível
-
-[ ] Histórico preservado
-
-[ ] Relação criada
+[ ] Status atualizado
 
 [ ] Evento publicado
 ```
 
 ---
 
-## Check-in
+## Exportação
 
 ```text
-[ ] Paciente identificado
+[ ] Permissão validada
 
-[ ] Horário válido
+[ ] Formato suportado
 
-[ ] Status atualizado
+[ ] Auditoria registrada
 
-[ ] Queue atualizada
+[ ] Exportação concluída
 ```
 
 ---
@@ -3564,7 +3441,7 @@ Waiting List
 # 266. Checklist de Code Review
 
 ```text
-[ ] Sem Double Booking
+[ ] Sem alteração em prescrições assinadas
 
 [ ] Aggregate preservado
 
@@ -3572,13 +3449,13 @@ Waiting List
 
 [ ] Auditoria implementada
 
-[ ] APIs documentadas
-
 [ ] Testes atualizados
+
+[ ] APIs documentadas
 
 [ ] Tenant Isolation preservado
 
-[ ] Recursos validados
+[ ] Sem acoplamento à infraestrutura
 ```
 
 ---
@@ -3588,7 +3465,7 @@ Waiting List
 Uma funcionalidade somente será considerada concluída quando atender:
 
 ```text
-Consistência
+Integridade
 
 +
 
@@ -3628,17 +3505,17 @@ O domínio deverá possuir cobertura automatizada para regras críticas.
 Cobrir:
 
 ```text
-Appointment
+Prescription
 
-Availability
+PrescriptionItem
 
-Calendar
+Renewal
 
-ScheduleBlock
+Signature
 
-WaitingList
+Cancellation
 
-Resource Reservation
+Validation
 ```
 
 ---
@@ -3652,20 +3529,20 @@ Persistence
 
 API
 
-Calendar Sync
-
-Telemedicine
+Event Bus
 
 Audit
 
-Event Bus
+Export
+
+Templates
 ```
 
 ---
 
 # 271. Testes de Concorrência
 
-Validar reservas simultâneas para o mesmo horário e os mesmos recursos.
+Validar múltiplas operações simultâneas sobre prescrições em Draft.
 
 ---
 
@@ -3678,11 +3555,11 @@ Permissions
 
 Tenant Isolation
 
-Delegation
+Signature Integrity
+
+Export Rules
 
 Audit Trail
-
-Calendar Access
 ```
 
 ---
@@ -3692,15 +3569,15 @@ Calendar Access
 Avaliar:
 
 ```text
-Pesquisa
+Search
 
-Agenda diária
+Export
 
-Grande volume de Slots
+Bulk Operations
 
-Recorrências
+Read Models
 
-Sincronizações
+API Response Time
 ```
 
 ---
@@ -3712,78 +3589,78 @@ Events preserve history.
 
 Aggregate controls consistency.
 
-Appointments preserve identity.
+Signed Prescriptions remain immutable.
 
-Read Models never modify domain state.
+Queries never change domain state.
 
 Commands preserve business rules.
 
-Audit remains mandatory.
+Read Models never become Source of Truth.
 
-Scheduling remains the Source of Truth.
+Audit remains mandatory.
 ```
 
 ---
 
 # 275. Decisões Arquiteturais e de Produto
 
-## ADR-1131
+## ADR-1071
 
-Eventos serão publicados após alterações relevantes.
+Eventos de domínio serão publicados após alterações relevantes.
 
 ---
 
-## ADR-1132
+## ADR-1072
 
 Payloads permanecerão mínimos e versionados.
 
 ---
 
-## ADR-1133
+## ADR-1073
 
 CQRS poderá ser adotado sem remodelar o domínio.
 
 ---
 
-## ADR-1134
+## ADR-1074
 
 Read Models especializados serão permitidos.
 
 ---
 
-## ADR-1135
+## ADR-1075
 
-Medical Records consumirá apenas eventos administrativos do agendamento.
-
----
-
-## ADR-1136
-
-Toda alteração relevante permanecerá auditável.
+Medical Records consumirá projeções da Timeline.
 
 ---
 
-## ADR-1137
+## ADR-1076
+
+Toda exportação permanecerá auditável.
+
+---
+
+## ADR-1077
 
 Testes automatizados serão obrigatórios para regras críticas.
 
 ---
 
-## ADR-1138
+## ADR-1078
 
-Observabilidade fará parte da arquitetura padrão.
+Observabilidade será parte integrante da arquitetura.
 
 ---
 
-## ADR-1139
+## ADR-1079
 
 Eventos deverão ser idempotentes.
 
 ---
 
-## ADR-1140
+## ADR-1080
 
-Scheduling permanecerá desacoplado dos módulos consumidores.
+Prescriptions permanecerá desacoplado dos módulos consumidores.
 
 ---
 
@@ -3802,45 +3679,42 @@ Na Parte 7 serão apresentados:
 
 # 277. Arquitetura Consolidada
 
-O módulo Scheduling deverá permanecer responsável exclusivamente pelo gerenciamento da disponibilidade e dos agendamentos da plataforma.
+O módulo Prescriptions deverá permanecer responsável exclusivamente pela gestão das ordens terapêuticas emitidas por profissionais de saúde.
 
 Seu domínio deverá permanecer desacoplado de:
 
 - Medical Records
-- Finance
-- Prescriptions
-- Notifications
-- Analytics
-- AI
-
-Esses módulos apenas consomem eventos produzidos pelo Scheduling.
+- Pharmacy
+- Inventory
+- Billing
+- Medication Administration
 
 ---
 
 # 278. Arquitetura Conceitual
 
 ```text
-Patient
+Medical Records
 
 ↓
 
-Appointment
+Encounter
 
 ↓
 
-Schedule
+Prescription
 
 ↓
 
-Availability
+Prescription Items
 
 ↓
 
-Resources
+Clinical Validation
 
 ↓
 
-Calendar
+Signature
 
 ↓
 
@@ -3851,34 +3725,26 @@ Events
 Consumers
 ```
 
-O fluxo deverá permanecer simples e previsível.
-
 ---
 
 # 279. Responsabilidade
 
-Scheduling deverá responder apenas:
+Prescriptions deverá responder apenas:
 
 ```text
-Quando ocorrerá o atendimento?
-
-Quem atenderá?
-
-Onde ocorrerá?
-
-Existe disponibilidade?
+Qual tratamento foi prescrito?
 ```
 
 Jamais:
 
 ```text
-O paciente foi diagnosticado?
+O medicamento foi administrado?
 
-Qual medicamento foi prescrito?
+O paciente tomou?
 
-O pagamento foi realizado?
+Existe estoque?
 
-O atendimento foi concluído clinicamente?
+A farmácia dispensou?
 ```
 
 Essas responsabilidades pertencem a outros domínios.
@@ -3889,55 +3755,56 @@ Essas responsabilidades pertencem a outros domínios.
 
 ```text
 Patients
-      │
-      ▼
-Scheduling
-      │
- ┌────┼───────────────┐
- ▼    ▼               ▼
-Medical Records   Notifications   Finance
+     │
+     ▼
+Medical Records
+     │
+     ▼
+Prescriptions
+     │
+ ┌───┼──────────────┐
+ ▼   ▼              ▼
+Notifications   Analytics   AI
 ```
 
-O Scheduling fornece contexto temporal para os demais módulos.
+Todos os módulos deverão consumir a prescrição através de interfaces oficiais.
 
 ---
 
 # 281. Anti-Corruption Layer
 
-Integrações externas nunca deverão conhecer a estrutura interna do Aggregate Appointment.
+Integrações externas nunca deverão conhecer a estrutura interna do Aggregate.
 
-Toda comunicação deverá ocorrer através de:
+Todo acesso deverá ocorrer através de:
 
 - APIs públicas;
-- eventos de domínio;
-- contratos versionados;
-- adaptadores.
+- eventos;
+- adaptadores;
+- contratos versionados.
 
 ---
 
 # 282. Future Evolution
 
-O domínio foi projetado para suportar futuras evoluções como:
+O domínio deverá suportar futuras integrações com:
 
 ```text
-AI Scheduling
+FHIR MedicationRequest
 
-Predictive Scheduling
+FHIR Medication
 
-Automatic Waiting List
+National ePrescription
 
-Smart Resource Allocation
+Digital Signature Providers
 
-Multi-Clinic Optimization
+Clinical Decision Support Systems
 
-Cross-Timezone Scheduling
+Medication Knowledge Bases
 
-FHIR Scheduling
-
-Calendar Federation
+International Standards
 ```
 
-Sem necessidade de remodelar o domínio principal.
+Sem necessidade de remodelar a arquitetura central.
 
 ---
 
@@ -3945,12 +3812,12 @@ Sem necessidade de remodelar o domínio principal.
 
 Possíveis funcionalidades futuras:
 
-- encaixes inteligentes;
-- previsão de atrasos;
-- sugestão automática de horários;
-- redistribuição automática da agenda;
-- previsão de No Show utilizando IA;
-- otimização automática de recursos.
+- prescrições recorrentes;
+- terapias de longa duração;
+- protocolos clínicos;
+- prescrições colaborativas;
+- integração com farmácias;
+- integração nacional de prescrições eletrônicas.
 
 ---
 
@@ -3959,21 +3826,19 @@ Possíveis funcionalidades futuras:
 Evitar:
 
 ```text
-Misturar agenda com prontuário.
+Misturar estoque com prescrição.
 
-Permitir Double Booking sem regra explícita.
+Modificar prescrições assinadas.
 
-Modificar histórico de agendamentos.
+Excluir prescrições emitidas.
 
-Acoplar Scheduling ao Google Calendar.
+Duplicar catálogo de medicamentos.
 
-Persistir disponibilidade manualmente.
+Acoplar regras ao provedor de assinatura.
 
-Ignorar Timezone.
+Misturar administração do medicamento com a ordem terapêutica.
 
-Criar regras clínicas dentro da agenda.
-
-Permitir reservas sem validação de recursos.
+Persistir informações clínicas pertencentes ao Medical Records.
 ```
 
 ---
@@ -3982,12 +3847,12 @@ Permitir reservas sem validação de recursos.
 
 O domínio deverá permanecer válido mesmo após:
 
+- mudança de banco de dados;
+- troca de framework;
 - migração para microsserviços;
-- troca de banco de dados;
-- mudança de linguagem;
 - adoção de Event Sourcing;
 - adoção completa de CQRS;
-- integração com novos provedores de calendário.
+- evolução das regulamentações.
 
 A modelagem deverá sobreviver às mudanças tecnológicas.
 
@@ -3998,84 +3863,82 @@ A modelagem deverá sobreviver às mudanças tecnológicas.
 Independentemente da evolução do MedFlow:
 
 ```text
-Scheduling manages time.
+Prescription is immutable after signature.
 
-Appointments preserve history.
+Prescription is not Medication Administration.
 
-Availability is deterministic.
-
-Resources respect availability.
+History is permanent.
 
 Audit is mandatory.
 
-Clinical data belongs to Medical Records.
+Clinical decisions belong to professionals.
 
-External integrations never control the domain.
+Integrations never bypass the domain.
 ```
 
-Esses princípios deverão permanecer inalterados.
+Esses princípios deverão orientar toda evolução futura.
 
 ---
 
 # 287. ADRs Finais
 
-## ADR-1141
+## ADR-1081
 
-Appointment continuará sendo o Aggregate Root exclusivo do domínio.
-
----
-
-## ADR-1142
-
-Availability continuará sendo derivada das regras da agenda.
+Prescription continuará sendo o Aggregate Root exclusivo do domínio.
 
 ---
 
-## ADR-1143
+## ADR-1082
 
-Double Booking permanecerá bloqueado por padrão.
-
----
-
-## ADR-1144
-
-Recursos físicos utilizarão gerenciamento independente.
+Prescrições assinadas permanecerão permanentemente imutáveis.
 
 ---
 
-## ADR-1145
+## ADR-1083
 
-Scheduling será preparado para integração completa com FHIR Scheduling.
-
----
-
-## ADR-1146
-
-Toda alteração relevante produzirá auditoria obrigatória.
+Toda renovação criará nova entidade.
 
 ---
 
-## ADR-1147
+## ADR-1084
 
-Eventos permanecerão versionados e idempotentes.
-
----
-
-## ADR-1148
-
-Read Models permanecerão desacoplados do Aggregate.
+A administração do medicamento permanecerá fora deste domínio.
 
 ---
 
-## ADR-1149
+## ADR-1085
 
-Integrações externas nunca alterarão diretamente o domínio.
+O domínio será preparado para integração completa com FHIR MedicationRequest.
 
 ---
 
-## ADR-1150
+## ADR-1086
 
-Scheduling será a única fonte oficial de disponibilidade e agendamentos da plataforma MedFlow.
+Toda alteração administrativa produzirá auditoria.
+
+---
+
+## ADR-1087
+
+Integrações utilizarão eventos versionados e APIs estáveis.
+
+---
+
+## ADR-1088
+
+Clinical Decision Support permanecerá desacoplado do Aggregate.
+
+---
+
+## ADR-1089
+
+Prescriptions permanecerá independente do catálogo de medicamentos.
+
+---
+
+## ADR-1090
+
+Prescriptions será a única fonte oficial das ordens terapêuticas emitidas na plataforma MedFlow.
 
 ---
 
@@ -4084,15 +3947,10 @@ Scheduling será a única fonte oficial de disponibilidade e agendamentos da pla
 | Item | Status |
 |------|--------|
 | Aggregate Root definido | ✓ |
-| Schedules modelados | ✓ |
-| Calendários | ✓ |
-| Disponibilidade | ✓ |
-| Time Slots | ✓ |
-| Recorrências | ✓ |
-| Check-in | ✓ |
-| Waiting List | ✓ |
-| Recursos físicos | ✓ |
-| Telemedicina | ✓ |
+| Prescription Items modelados | ✓ |
+| Assinatura clínica | ✓ |
+| Renovações | ✓ |
+| Cancelamentos | ✓ |
 | Auditoria | ✓ |
 | LGPD | ✓ |
 | Multi-tenant | ✓ |
@@ -4100,23 +3958,25 @@ Scheduling será a única fonte oficial de disponibilidade e agendamentos da pla
 | Eventos de domínio | ✓ |
 | CQRS preparado | ✓ |
 | Read Models | ✓ |
-| Arquitetura Hexagonal | ✓ |
+| Integração FHIR preparada | ✓ |
 | Observabilidade | ✓ |
 | KPIs | ✓ |
+| Testabilidade | ✓ |
+| Arquitetura Hexagonal | ✓ |
 | ADRs documentadas | ✓ |
 
 ---
 
 # 289. Definition of Success
 
-O módulo Scheduling será considerado bem projetado quando:
+O módulo Prescriptions será considerado bem projetado quando:
 
-- impedir conflitos de agenda;
-- preservar histórico completo;
-- suportar milhões de agendamentos;
-- integrar-se facilmente com calendários externos;
-- permanecer desacoplado dos domínios clínicos;
-- otimizar a utilização de profissionais e recursos;
+- preservar a integridade das ordens terapêuticas;
+- impedir alterações indevidas após assinatura;
+- suportar milhões de prescrições;
+- manter histórico completo;
+- integrar-se facilmente com outros módulos;
+- permanecer desacoplado da infraestrutura;
 - atender requisitos regulatórios;
 - evoluir sem quebrar consumidores.
 
@@ -4124,29 +3984,18 @@ O módulo Scheduling será considerado bem projetado quando:
 
 # 290. Considerações Finais
 
-O módulo Scheduling representa o coração operacional da plataforma MedFlow.
+O módulo Prescriptions representa a formalização da decisão terapêutica tomada durante um atendimento.
 
-Seu papel é garantir que pacientes, profissionais, salas e recursos estejam sincronizados de forma consistente, auditável e escalável.
+Seu papel é garantir que cada prescrição emitida seja:
 
-Todas as decisões arquiteturais apresentadas neste documento têm como objetivo preservar:
+- íntegra;
+- rastreável;
+- auditável;
+- segura;
+- interoperável;
+- preparada para evolução futura.
 
-```text
-Consistência
-
-Disponibilidade
-
-Escalabilidade
-
-Auditabilidade
-
-Interoperabilidade
-
-Simplicidade
-
-Sustentabilidade
-```
-
-Esses princípios deverão orientar toda evolução futura do módulo.
+Toda decisão arquitetural apresentada neste documento busca preservar esses princípios e garantir que o domínio permaneça sustentável por muitos anos.
 
 ---
 
@@ -4154,4 +4003,4 @@ Esses princípios deverão orientar toda evolução futura do módulo.
 
 | Versão | Data | Alterações | Responsável |
 |---------|------|------------|-------------|
-| 1.0 | 2026 | Criação da documentação oficial do módulo Scheduling, incluindo agendas, disponibilidade, calendários, recursos, recorrências, check-in, telemedicina, auditoria, CQRS, observabilidade e ADR-1091 a ADR-1150 | Equipe MedFlow |
+| 1.0 | 2026 | Criação da documentação oficial do módulo Prescriptions, incluindo modelagem de prescrições, assinatura clínica, itens, auditoria, segurança, integrações, arquitetura, CQRS, observabilidade e ADR-1031 a ADR-1090 | Equipe MedFlow |
